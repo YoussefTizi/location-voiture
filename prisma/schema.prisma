@@ -1,0 +1,432 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Transmission {
+  automatic
+  manual
+}
+
+enum FuelType {
+  petrol
+  diesel
+  electric
+  hybrid
+}
+
+enum CarAvailabilityStatus {
+  available
+  rented
+  maintenance
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+}
+
+enum LogoDisplayMode {
+  text
+  image
+}
+
+enum HeroSideImageMode {
+  image
+  car_showcase
+}
+
+enum ThemeLayoutStyle {
+  modern
+  classic
+  minimal
+}
+
+enum ThemeButtonStyle {
+  rounded
+  sharp
+  pill
+}
+
+enum ThemeCardStyle {
+  elevated
+  flat
+  bordered
+}
+
+enum ThemeSpacingDensity {
+  compact
+  normal
+  spacious
+}
+
+enum ThemeHeaderStyle {
+  transparent
+  solid
+  glass
+}
+
+enum HeroImagePosition {
+  left
+  right
+}
+
+enum HeroBackgroundType {
+  solid
+  image
+  pattern
+}
+
+enum HeroPatternType {
+  dots
+  grid
+  diagonal
+  hexagons
+  waves
+}
+
+enum SectionType {
+  hero
+  search
+  cars
+  features
+  cities
+  testimonials
+  about
+  faq
+  cta
+  estimation
+  contact
+  footer
+}
+
+enum SectionBackgroundStyle {
+  light
+  dark
+  gradient
+  accent
+}
+
+enum SectionLayoutVariant {
+  default
+  centered
+  split
+  minimal
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admin_user")
+}
+
+model Car {
+  id                 String                @id
+  name               String
+  category           String
+  pricePerDay        Float                 @map("price_per_day")
+  transmission       Transmission
+  fuelType           FuelType              @map("fuel_type")
+  seats              Int
+  availabilityStatus CarAvailabilityStatus @map("availability_status")
+  featured           Boolean               @default(false)
+  description        String
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  images   CarImage[]
+  bookings Booking[]
+
+  @@map("car")
+}
+
+model CarImage {
+  id        String @id @default(uuid())
+  carId     String @map("car_id")
+  url       String
+  sortOrder Int    @default(0) @map("sort_order")
+  car       Car    @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@index([carId, sortOrder])
+  @@map("car_image")
+}
+
+model Booking {
+  id           String        @id @map("booking_id")
+  customerName String        @map("customer_name")
+  phone        String
+  email        String
+  pickupDate   DateTime      @map("pickup_date")
+  returnDate   DateTime      @map("return_date")
+  carId        String        @map("car_id")
+  status       BookingStatus
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  car          Car           @relation(fields: [carId], references: [id], onDelete: Restrict)
+
+  @@index([carId, status])
+  @@map("booking")
+}
+
+model ThemeConfig {
+  id                    String            @id @default("default")
+  primaryColor          String            @map("primary_color")
+  secondaryColor        String            @map("secondary_color")
+  accentColor           String            @map("accent_color")
+  backgroundColor       String            @map("background_color")
+  textColor             String            @map("text_color")
+  fontFamily            String            @map("font_family")
+  headingFont           String            @map("heading_font")
+  borderRadius          String            @map("border_radius")
+  layoutStyle           ThemeLayoutStyle  @map("layout_style")
+  buttonStyle           ThemeButtonStyle  @map("button_style")
+  cardStyle             ThemeCardStyle    @map("card_style")
+  cardStyleVariant      String            @map("card_style_variant")
+  spacingDensity        ThemeSpacingDensity @map("spacing_density")
+  darkModeEnabled       Boolean           @default(false) @map("dark_mode_enabled")
+  headerStyle           ThemeHeaderStyle  @map("header_style")
+  siteName              String            @map("site_name")
+  landingPageTheme      String            @map("landing_page_theme")
+  heroImagePosition     HeroImagePosition @map("hero_image_position")
+  flatDesign            Boolean           @default(false) @map("flat_design")
+  selectedCurrency      String            @map("selected_currency")
+  heroBackgroundImage   String            @default("") @map("hero_background_image")
+  heroBackgroundEnabled Boolean           @default(false) @map("hero_background_enabled")
+  heroBackgroundType    HeroBackgroundType @map("hero_background_type")
+  heroPatternType       HeroPatternType    @map("hero_pattern_type")
+  heroPatternOpacity    Int                @map("hero_pattern_opacity")
+  heroSolidColor        String             @map("hero_solid_color")
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@map("theme_config")
+}
+
+model SectionConfig {
+  id              String                 @id
+  type            SectionType
+  enabled         Boolean                @default(true)
+  title           Json
+  subtitle        Json
+  content         String
+  backgroundStyle SectionBackgroundStyle @map("background_style")
+  layoutVariant   SectionLayoutVariant   @map("layout_variant")
+  sortOrder       Int                    @map("sort_order")
+  backgroundImage String?                @map("background_image")
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([sortOrder])
+  @@map("section_config")
+}
+
+model SiteConfig {
+  id                String            @id @default("default")
+  logoText          String            @map("logo_text")
+  logoImage         String            @default("") @map("logo_image")
+  logoDisplayMode   LogoDisplayMode   @map("logo_display_mode")
+  logoTagline       Json              @map("logo_tagline")
+  heroBackgroundImage String          @map("hero_background_image")
+  heroSideImage     String            @map("hero_side_image")
+  heroSideImageMode HeroSideImageMode @map("hero_side_image_mode")
+  copyright         String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@map("site_config")
+}
+
+model SEOConfig {
+  id          String   @id @default("default")
+  title       Json
+  description Json
+  keywords    String
+  ogImage     String   @map("og_image")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("seo_config")
+}
+
+model ContactConfig {
+  id          String       @id @default("default")
+  phone       String
+  whatsapp    String
+  email       String
+  address     Json
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  socialLinks SocialLink[]
+  agencies    Agency[]
+
+  @@map("contact_config")
+}
+
+model SocialLink {
+  id              String        @id @default(uuid())
+  contactConfigId String        @default("default") @map("contact_config_id")
+  platform        String
+  url             String
+  icon            String
+  sortOrder       Int           @default(0) @map("sort_order")
+  contactConfig   ContactConfig @relation(fields: [contactConfigId], references: [id], onDelete: Cascade)
+
+  @@index([contactConfigId, sortOrder])
+  @@map("social_link")
+}
+
+model Agency {
+  id              String        @id
+  contactConfigId String        @default("default") @map("contact_config_id")
+  name            Json
+  address         Json
+  lat             Float
+  lng             Float
+  phone           String
+  googleMapsUrl   String        @map("google_maps_url")
+  enabled         Boolean       @default(true)
+  sortOrder       Int           @default(0) @map("sort_order")
+  contactConfig   ContactConfig @relation(fields: [contactConfigId], references: [id], onDelete: Cascade)
+
+  @@index([contactConfigId, sortOrder])
+  @@map("agency")
+}
+
+model NavItem {
+  id         String   @id
+  label      Json
+  href       String
+  enabled    Boolean  @default(true)
+  showInMenu Boolean  @default(true) @map("show_in_menu")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@map("nav_item")
+}
+
+model City {
+  id        String   @id
+  name      Json
+  image     String
+  enabled   Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@map("city")
+}
+
+model Testimonial {
+  id        String   @id
+  name      String
+  rating    Int
+  review    Json
+  avatar    String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@map("testimonial")
+}
+
+model Feature {
+  id          String   @id
+  icon        String
+  title       Json
+  description Json
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@map("feature")
+}
+
+model EstimationConfig {
+  id                      String            @id @default("default")
+  enabled                 Boolean           @default(true)
+  defaultCity             String            @map("default_city")
+  deliveryFreeStart       String            @map("delivery_free_start")
+  deliveryFreeEnd         String            @map("delivery_free_end")
+  nightDeliveryFee        Float             @map("night_delivery_fee")
+  currency                String
+  currencySymbol          String            @map("currency_symbol")
+  whatsappMessageTemplate String            @map("whatsapp_message_template")
+  showCityField           Boolean           @default(true) @map("show_city_field")
+  showDurationField       Boolean           @default(true) @map("show_duration_field")
+  showVehicleField        Boolean           @default(true) @map("show_vehicle_field")
+  showDateField           Boolean           @default(true) @map("show_date_field")
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  pricingTiers            PricingTier[]
+  badges                  EstimationBadge[]
+
+  @@map("estimation_config")
+}
+
+model PricingTier {
+  id                 String           @id
+  estimationConfigId String           @default("default") @map("estimation_config_id")
+  label              Json
+  durationLabel      String           @map("duration_label")
+  minDays            Int              @map("min_days")
+  maxDays            Int?             @map("max_days")
+  discountPercent    Float            @map("discount_percent")
+  sortOrder          Int              @default(0) @map("sort_order")
+  estimationConfig   EstimationConfig @relation(fields: [estimationConfigId], references: [id], onDelete: Cascade)
+
+  @@index([estimationConfigId, sortOrder])
+  @@map("pricing_tier")
+}
+
+model EstimationBadge {
+  id                 String           @id @default(uuid())
+  estimationConfigId String           @default("default") @map("estimation_config_id")
+  icon               String
+  label              Json
+  sortOrder          Int              @default(0) @map("sort_order")
+  estimationConfig   EstimationConfig @relation(fields: [estimationConfigId], references: [id], onDelete: Cascade)
+
+  @@index([estimationConfigId, sortOrder])
+  @@map("estimation_badge")
+}
+
+model BookingFormConfig {
+  id             String   @id @default("default")
+  showName       Boolean  @default(true) @map("show_name")
+  showEmail      Boolean  @default(true) @map("show_email")
+  showPhone      Boolean  @default(true) @map("show_phone")
+  showPickupDate Boolean  @default(true) @map("show_pickup_date")
+  showReturnDate Boolean  @default(true) @map("show_return_date")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("booking_form_config")
+}
+
+model CustomTheme {
+  id            String   @id
+  name          String
+  description   String
+  previewColors Json     @map("preview_colors")
+  overrides     Json
+  isCustom      Boolean  @default(true) @map("is_custom")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("custom_theme")
+}

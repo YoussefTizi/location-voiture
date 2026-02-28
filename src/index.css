@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 7%;
+    --foreground: 40 10% 92%;
+    --card: 220 18% 10%;
+    --card-foreground: 40 10% 92%;
+    --popover: 220 18% 10%;
+    --popover-foreground: 40 10% 92%;
+    --primary: 43 72% 58%;
+    --primary-foreground: 220 20% 7%;
+    --secondary: 220 15% 15%;
+    --secondary-foreground: 40 10% 85%;
+    --muted: 220 15% 14%;
+    --muted-foreground: 220 10% 50%;
+    --accent: 43 50% 45%;
+    --accent-foreground: 40 10% 95%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 18%;
+    --input: 220 15% 16%;
+    --ring: 43 72% 58%;
+    --radius: 0.75rem;
+
+    --sidebar-background: 220 18% 10%;
+    --sidebar-foreground: 40 10% 85%;
+    --sidebar-primary: 43 72% 58%;
+    --sidebar-primary-foreground: 220 20% 7%;
+    --sidebar-accent: 220 15% 15%;
+    --sidebar-accent-foreground: 40 10% 92%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 43 72% 58%;
+
+    --glass-bg: 220 18% 10% / 0.7;
+    --glass-border: 220 15% 25% / 0.5;
+    --gold-glow: 43 72% 58% / 0.15;
+
+    font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .dark {
+    --background: 220 20% 7%;
+    --foreground: 40 10% 92%;
+    --card: 220 18% 10%;
+    --card-foreground: 40 10% 92%;
+    --popover: 220 18% 10%;
+    --popover-foreground: 40 10% 92%;
+    --primary: 43 72% 58%;
+    --primary-foreground: 220 20% 7%;
+    --secondary: 220 15% 15%;
+    --secondary-foreground: 40 10% 85%;
+    --muted: 220 15% 14%;
+    --muted-foreground: 220 10% 50%;
+    --accent: 43 50% 45%;
+    --accent-foreground: 40 10% 95%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 18%;
+    --input: 220 15% 16%;
+    --ring: 43 72% 58%;
+  }
+
+  .light-admin {
+    --background: 0 0% 97%;
+    --foreground: 220 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+    --primary: 43 72% 50%;
+    --primary-foreground: 220 20% 7%;
+    --secondary: 220 10% 93%;
+    --secondary-foreground: 220 10% 30%;
+    --muted: 220 10% 93%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 43 50% 45%;
+    --accent-foreground: 40 10% 95%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 10% 88%;
+    --input: 220 10% 90%;
+    --ring: 43 72% 50%;
+  }
+
+  /* Frontend theme - dynamically overridden */
+  .frontend-theme {
+    --ft-primary: 43 72% 58%;
+    --ft-secondary: 220 15% 15%;
+    --ft-bg: 0 0% 100%;
+    --ft-fg: 220 20% 10%;
+    --ft-card: 0 0% 98%;
+    --ft-card-fg: 220 20% 10%;
+    --ft-muted: 220 10% 95%;
+    --ft-muted-fg: 220 10% 40%;
+    --ft-border: 220 10% 90%;
+    --ft-radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--glass-border));
+  }
+  .gold-glow {
+    box-shadow: 0 0 40px hsl(var(--gold-glow)), 0 0 80px hsl(var(--gold-glow));
+  }
+  .text-gradient-gold {
+    background: linear-gradient(135deg, hsl(43 72% 58%), hsl(35 80% 68%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .btn-animated {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-animated::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.5s ease;
+  }
+  .btn-animated:hover::after {
+    transform: translateX(100%);
+  }
+  .btn-animated:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -5px rgba(0,0,0,0.2);
+  }
+  .btn-animated:active {
+    transform: translateY(0px) scale(0.97);
+    box-shadow: 0 2px 8px -2px rgba(0,0,0,0.15);
+  }
+}
