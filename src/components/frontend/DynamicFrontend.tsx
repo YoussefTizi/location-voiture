@@ -63,6 +63,16 @@ const getCurrencySymbol = (theme: ExtendedThemeConfig, estimation: any) => {
   return cur ? cur.symbol : estimation.currency_symbol;
 };
 
+const getCurrencyFlag = (code: string) => {
+  const flags: Record<string, string> = {
+    MAD: "🇲🇦",
+    EUR: "🇪🇺",
+    USD: "🇺🇸",
+    GBP: "🇬🇧",
+  };
+  return flags[code] || "🏳️";
+};
+
 const parseHslLightness = (color: string) => {
   const normalized = color.trim();
   const hslBody = normalized.startsWith("hsl(") ? normalized.slice(4, -1) : normalized;
@@ -156,6 +166,8 @@ const FrontendHeader = ({ theme }: { theme: ExtendedThemeConfig }) => {
   };
 
   const curSymbol = getCurrencySymbol(theme, { currency_symbol: "DH" });
+  const selectedCurrency = currencyOptions.find((c) => c.code === theme.selected_currency);
+  const selectedCurrencyFlag = getCurrencyFlag(selectedCurrency?.code || "");
 
   return (
     <>
@@ -202,6 +214,7 @@ const FrontendHeader = ({ theme }: { theme: ExtendedThemeConfig }) => {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-100 border"
                 style={{ color: headerTextColor, opacity: 0.8, borderColor: dropdownBorder }}>
                 <DollarSign size={14} />
+                <span>{selectedCurrencyFlag}</span>
                 <span className="font-bold">{curSymbol}</span>
                 <ChevronDown size={12} />
               </button>
@@ -210,9 +223,12 @@ const FrontendHeader = ({ theme }: { theme: ExtendedThemeConfig }) => {
                   style={{ background: dropdownBg, borderColor: dropdownBorder }}>
                   {currencyOptions.map(c => (
                     <button key={c.code} onClick={() => { updateTheme({ selected_currency: c.code }); setCurOpen(false); }}
-                      className="w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between"
+                      className="w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between gap-2"
                       style={{ color: theme.selected_currency === c.code ? ts.primaryHSL : headerTextColor, fontWeight: theme.selected_currency === c.code ? 700 : 400 }}>
-                      {c.label}
+                      <span className="flex items-center gap-2">
+                        <span>{getCurrencyFlag(c.code)}</span>
+                        <span>{c.label}</span>
+                      </span>
                       {theme.selected_currency === c.code && <CheckCircle2 size={14} style={{ color: ts.primaryHSL }} />}
                     </button>
                   ))}
@@ -266,8 +282,9 @@ const FrontendHeader = ({ theme }: { theme: ExtendedThemeConfig }) => {
                 <div className="flex gap-2 px-4">
                   {currencyOptions.map(c => (
                     <button key={c.code} onClick={() => updateTheme({ selected_currency: c.code })}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
                       style={{ background: theme.selected_currency === c.code ? ts.primaryHSL : "transparent", color: theme.selected_currency === c.code ? "#fff" : (isDark ? "#888" : "#64748b") }}>
+                      <span>{getCurrencyFlag(c.code)}</span>
                       {c.symbol}
                     </button>
                   ))}
