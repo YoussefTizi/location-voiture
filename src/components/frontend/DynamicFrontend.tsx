@@ -3599,7 +3599,7 @@ const sectionMap: Record<string, React.FC<any>> = {
 
 const DynamicFrontend = () => {
   const pathname = usePathname();
-  const { sections, theme, cars, seo, stateReady } = useAdmin();
+  const { sections, theme, cars, seo, stateReady, customThemes } = useAdmin();
   const previewTheme = useMemo(() => {
     if (!pathname.startsWith("/preview/")) return null;
 
@@ -3618,16 +3618,28 @@ const DynamicFrontend = () => {
       presetKey = slug as LandingPageTheme;
     }
 
-    if (!presetKey) return null;
-    const preset = landingPageThemePresets[presetKey];
+    if (presetKey) {
+      const preset = landingPageThemePresets[presetKey];
+      return {
+        ...initialExtendedTheme,
+        ...preset.overrides,
+        landing_page_theme: presetKey,
+        footer_background_color: preset.overrides.footer_background_color ?? preset.overrides.secondary_color ?? initialExtendedTheme.footer_background_color,
+        footer_text_color: preset.overrides.footer_text_color ?? preset.overrides.text_color ?? initialExtendedTheme.footer_text_color,
+      } as ExtendedThemeConfig;
+    }
+
+    const customTheme = customThemes.find((t) => t.id === slug);
+    if (!customTheme) return null;
+
     return {
       ...initialExtendedTheme,
-      ...preset.overrides,
-      landing_page_theme: presetKey,
-      footer_background_color: preset.overrides.footer_background_color ?? preset.overrides.secondary_color ?? initialExtendedTheme.footer_background_color,
-      footer_text_color: preset.overrides.footer_text_color ?? preset.overrides.text_color ?? initialExtendedTheme.footer_text_color,
+      ...customTheme.overrides,
+      landing_page_theme: customTheme.id,
+      footer_background_color: customTheme.overrides.footer_background_color ?? customTheme.overrides.secondary_color ?? initialExtendedTheme.footer_background_color,
+      footer_text_color: customTheme.overrides.footer_text_color ?? customTheme.overrides.text_color ?? initialExtendedTheme.footer_text_color,
     } as ExtendedThemeConfig;
-  }, [pathname]);
+  }, [pathname, customThemes]);
   const effectiveTheme = previewTheme ?? theme;
   const { lt, lang, isRTL } = useLanguage();
   const ts = getThemeStyles(effectiveTheme);

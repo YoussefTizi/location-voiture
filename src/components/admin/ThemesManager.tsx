@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { useAdmin } from "@/context/AdminContext";
 import { landingPageThemePresets, type CustomThemePreset, type LandingPageTheme } from "@/data/site-config";
 import { Button } from "@/components/ui/button";
@@ -136,6 +137,11 @@ const ThemesManager = () => {
                   <Button variant={active ? "secondary" : "default"} size="sm" className="flex-1 text-xs" onClick={() => applyTheme(key)} disabled={active}>
                     {active ? "Appliqué" : "Appliquer"}
                   </Button>
+                  <Button asChild variant="outline" size="sm" className="text-xs">
+                    <Link href={`/preview/${key}`} target="_blank" rel="noreferrer">
+                      Preview
+                    </Link>
+                  </Button>
                   <Button variant="outline" size="sm" className="text-xs" onClick={() => exportTheme(key)}>
                     <Download size={12} />
                   </Button>
@@ -184,6 +190,11 @@ const ThemesManager = () => {
                   <div className="flex gap-2 mt-3">
                     <Button variant={active ? "secondary" : "default"} size="sm" className="flex-1 text-xs" onClick={() => applyTheme(ct.id)} disabled={active}>
                       {active ? "Appliqué" : "Appliquer"}
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className="text-xs">
+                      <Link href={`/preview/${ct.id}`} target="_blank" rel="noreferrer">
+                        Preview
+                      </Link>
                     </Button>
                     <Button variant="outline" size="sm" className="text-xs" onClick={() => exportTheme(ct.id)}>
                       <Download size={12} />
