@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { useAdmin } from "@/context/AdminContext";
 import { useLanguage } from "@/context/LanguageContext";
-import type { ExtendedThemeConfig, ExtendedSectionConfig, Language, LandingPageTheme } from "@/data/site-config";
-import { currencyOptions } from "@/data/site-config";
+import type { ExtendedThemeConfig, ExtendedSectionConfig, Language } from "@/data/site-config";
+import { currencyOptions, initialExtendedTheme, landingPageThemePresets, type LandingPageTheme } from "@/data/site-config";
 import { getHeroBackgroundCSS } from "@/components/admin/HeroBackgroundEditor";
 import type { Car } from "@/data/mock-database";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,6 +17,7 @@ import {
   Settings2, Instagram, Facebook, Twitter, Linkedin, Mail, PhoneCall, ArrowRight,
   Zap, Headphones, Gem, ChevronDown, Sparkles, Globe, DollarSign, Navigation, ExternalLink,
   Briefcase, Quote, ArrowUpRight, Minus,
+  Info,
 } from "lucide-react";
 
 /* ─── Icon resolver ─── */
@@ -38,29 +40,60 @@ const btnRadius = (s: ExtendedThemeConfig["button_style"]) =>
 const getThemeStyles = (theme: ExtendedThemeConfig) => {
   const lp = theme.landing_page_theme;
   const isDark = lp === "sporty" || lp === "neon";
-  const themeMap: Record<LandingPageTheme, { heroBg: string; heroText: string; heroMuted: string; cardBg: string; sectionAlt: string; footerBg: string }> = {
-    elegant: { heroBg: "#fafafa", heroText: "#1a1a2e", heroMuted: "#64748b", cardBg: "#ffffff", sectionAlt: "#f8fafc", footerBg: "#0f172a" },
-    sporty: { heroBg: "#0f0f0f", heroText: "#ffffff", heroMuted: "rgba(255,255,255,0.6)", cardBg: "#ffffff", sectionAlt: "#111111", footerBg: "#050505" },
-    eco: { heroBg: "#f0f7f4", heroText: "#1a3a2a", heroMuted: "#4a6a5a", cardBg: "#ffffff", sectionAlt: "#e8f5e9", footerBg: "#0f172a" },
-    classic: { heroBg: "#f8f6f0", heroText: "#1a1a3e", heroMuted: "#5c5c7a", cardBg: "#ffffff", sectionAlt: "#f5f0e6", footerBg: "#1a1a3e" },
-    neon: { heroBg: "#0a0a14", heroText: "#ffffff", heroMuted: "rgba(255,255,255,0.55)", cardBg: "#12121e", sectionAlt: "#0e0e1a", footerBg: "#06060e" },
-    sunset: { heroBg: "#fef7f0", heroText: "#2d1b0e", heroMuted: "#8b6e5a", cardBg: "#ffffff", sectionAlt: "#fdf2e9", footerBg: "#1a0f08" },
-    arctic: { heroBg: "#f0f7fc", heroText: "#0c2d48", heroMuted: "#5a8aab", cardBg: "#ffffff", sectionAlt: "#e8f2fa", footerBg: "#0c1e2e" },
-    desert: { heroBg: "#faf5ef", heroText: "#2a1f14", heroMuted: "#8a7565", cardBg: "#ffffff", sectionAlt: "#f5ebe0", footerBg: "#1a140e" },
-  };
-  const t = themeMap[lp] || themeMap.elegant;
+  const heroBg = `hsl(${theme.background_color})`;
+  const heroText = `hsl(${theme.text_color})`;
+  const heroMuted = `hsl(${theme.text_color} / ${isDark ? "0.76" : "0.64"})`;
+  const cardBg = isDark ? `hsl(${theme.secondary_color} / 0.32)` : `hsl(${theme.background_color})`;
+  const sectionAlt = isDark ? `hsl(${theme.secondary_color} / 0.24)` : `hsl(${theme.secondary_color} / 0.12)`;
+  const footerBg = `hsl(${theme.footer_background_color || theme.secondary_color})`;
   return {
     primaryHSL: `hsl(${theme.primary_color})`,
     accentHSL: `hsl(${theme.accent_color})`,
     secondaryHSL: `hsl(${theme.secondary_color})`,
     isDark,
-    ...t,
+    heroBg,
+    heroText,
+    heroMuted,
+    cardBg,
+    sectionAlt,
+    footerBg,
   };
 };
 
+const getCurrencyOption = (currencyCode: string) => currencyOptions.find((c) => c.code === currencyCode);
+
 const getCurrencySymbol = (theme: ExtendedThemeConfig, estimation: any) => {
-  const cur = currencyOptions.find(c => c.code === theme.selected_currency);
+  const cur = getCurrencyOption(theme.selected_currency);
   return cur ? cur.symbol : estimation.currency_symbol;
+};
+
+const convertFromMad = (amountMad: number, currencyCode: string) => {
+  const option = getCurrencyOption(currencyCode);
+  const rate = option?.rate_from_mad ?? 1;
+  return amountMad * rate;
+};
+
+const formatCurrencyAmount = (amount: number, currencyCode: string) => {
+  const decimals = currencyCode === "MAD" ? 0 : 2;
+  return new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(amount);
+};
+
+type CurrencyFormatRule = { position: "prefix" | "suffix"; token: "symbol" | "code" };
+const currencyFormatRules: Partial<Record<string, CurrencyFormatRule>> = {
+  USD: { position: "prefix", token: "symbol" },
+  EUR: { position: "prefix", token: "symbol" },
+  MAD: { position: "suffix", token: "code" },
+};
+
+const formatCurrencyDisplay = (amount: number, currencyCode: string, fallbackSymbol = "") => {
+  const option = getCurrencyOption(currencyCode);
+  const rule = currencyFormatRules[currencyCode] ?? { position: "prefix", token: "symbol" };
+  const token = rule.token === "code" ? currencyCode : (option?.symbol || fallbackSymbol || currencyCode);
+  const value = formatCurrencyAmount(amount, currencyCode);
+  return rule.position === "suffix" ? `${value} ${token}` : `${token}${value}`;
 };
 
 const getCurrencyFlag = (code: string) => {
@@ -73,64 +106,224 @@ const getCurrencyFlag = (code: string) => {
   return flags[code] || "🏳️";
 };
 
-const parseHslLightness = (color: string) => {
-  const normalized = color.trim();
-  const hslBody = normalized.startsWith("hsl(") ? normalized.slice(4, -1) : normalized;
-  const parts = hslBody.split(/\s+/).filter(Boolean);
-  const lightnessPart = parts[2];
-  if (!lightnessPart) return null;
-  const n = Number(lightnessPart.replace("%", ""));
-  return Number.isFinite(n) ? n : null;
+type Rgb = { r: number; g: number; b: number };
+type Hsl = { h: number; s: number; l: number };
+type ButtonPalette = { background: string; text: string };
+type ThemeColorSystem = {
+  text: string;
+  muted: string;
+  surface: string;
+  surfaceAlt: string;
+  border: string;
+  borderStrong: string;
+  inputBg: string;
+  inputText: string;
+  inputBorder: string;
+  placeholder: string;
+  primaryButton: ButtonPalette;
 };
 
-const parseHexLightness = (color: string) => {
-  const hex = color.replace("#", "").trim();
+const clamp255 = (value: number) => Math.max(0, Math.min(255, value));
+
+const parseHexColor = (input: string): Rgb | null => {
+  const hex = input.replace("#", "").trim();
   if (!/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(hex)) return null;
   const full = hex.length === 3 ? hex.split("").map((c) => c + c).join("") : hex;
-  const r = parseInt(full.slice(0, 2), 16);
-  const g = parseInt(full.slice(2, 4), 16);
-  const b = parseInt(full.slice(4, 6), 16);
-  return ((Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255) * 100;
+  return {
+    r: parseInt(full.slice(0, 2), 16),
+    g: parseInt(full.slice(2, 4), 16),
+    b: parseInt(full.slice(4, 6), 16),
+  };
 };
 
-const parseRgbLightness = (color: string) => {
-  const m = color.trim().match(/^rgba?\(([^)]+)\)$/i);
+const parseRgbColor = (input: string): Rgb | null => {
+  const m = input.trim().match(/^rgba?\(([^)]+)\)$/i);
   if (!m) return null;
-  const parts = m[1].split(",").map((p) => p.trim());
+  const parts = m[1].split(/[\s,/]+/).filter(Boolean);
   if (parts.length < 3) return null;
   const toChannel = (v: string) => {
     if (v.endsWith("%")) {
       const pct = Number(v.replace("%", ""));
-      if (!Number.isFinite(pct)) return null;
-      return Math.max(0, Math.min(255, (pct / 100) * 255));
+      return Number.isFinite(pct) ? clamp255((pct / 100) * 255) : NaN;
     }
     const n = Number(v);
-    return Number.isFinite(n) ? Math.max(0, Math.min(255, n)) : null;
+    return Number.isFinite(n) ? clamp255(n) : NaN;
   };
   const r = toChannel(parts[0]);
   const g = toChannel(parts[1]);
   const b = toChannel(parts[2]);
-  if (r === null || g === null || b === null) return null;
-  return ((Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255) * 100;
+  if (![r, g, b].every(Number.isFinite)) return null;
+  return { r, g, b };
 };
 
-const isDarkSurface = (color: string) => {
-  const hslLightness = parseHslLightness(color);
-  if (hslLightness !== null) return hslLightness < 55;
-  const rgbLightness = parseRgbLightness(color);
-  if (rgbLightness !== null) return rgbLightness < 55;
-  const hexLightness = parseHexLightness(color);
-  if (hexLightness !== null) return hexLightness < 55;
-  return false;
+const parseHslColor = (input: string): Rgb | null => {
+  const normalized = input.trim();
+  const hslBody = normalized.startsWith("hsl(") ? normalized.slice(4, -1) : normalized;
+  const parts = hslBody.split(/[\s,/]+/).filter(Boolean);
+  if (parts.length < 3) return null;
+  const h = Number(parts[0]);
+  const s = Number(parts[1].replace("%", "")) / 100;
+  const l = Number(parts[2].replace("%", "")) / 100;
+  if (![h, s, l].every(Number.isFinite)) return null;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const hh = (((h % 360) + 360) % 360) / 60;
+  const x = c * (1 - Math.abs((hh % 2) - 1));
+  let r1 = 0;
+  let g1 = 0;
+  let b1 = 0;
+  if (hh >= 0 && hh < 1) [r1, g1, b1] = [c, x, 0];
+  else if (hh < 2) [r1, g1, b1] = [x, c, 0];
+  else if (hh < 3) [r1, g1, b1] = [0, c, x];
+  else if (hh < 4) [r1, g1, b1] = [0, x, c];
+  else if (hh < 5) [r1, g1, b1] = [x, 0, c];
+  else [r1, g1, b1] = [c, 0, x];
+  const m = l - c / 2;
+  return {
+    r: clamp255(Math.round((r1 + m) * 255)),
+    g: clamp255(Math.round((g1 + m) * 255)),
+    b: clamp255(Math.round((b1 + m) * 255)),
+  };
 };
 
-const contrastTextColor = (bgColor: string) => (isDarkSurface(bgColor) ? "#ffffff" : "#0f172a");
+const parseHslParts = (input: string): Hsl | null => {
+  const normalized = input.trim();
+  const hslBody = normalized.startsWith("hsl(") ? normalized.slice(4, -1) : normalized;
+  const parts = hslBody.split(/[\s,/]+/).filter(Boolean);
+  if (parts.length < 3) return null;
+  const h = Number(parts[0]);
+  const s = Number(parts[1].replace("%", ""));
+  const l = Number(parts[2].replace("%", ""));
+  if (![h, s, l].every(Number.isFinite)) return null;
+  return { h, s, l };
+};
+
+const parseColorToRgb = (input: string): Rgb | null => {
+  const color = input.trim();
+  if (!color) return null;
+  if (color.startsWith("#")) return parseHexColor(color);
+  if (color.startsWith("rgb")) return parseRgbColor(color);
+  if (color.startsWith("hsl")) return parseHslColor(color);
+  if (/^\d+(\.\d+)?\s+\d+%?\s+\d+%?$/.test(color)) return parseHslColor(`hsl(${color})`);
+  return null;
+};
+
+const rgbToCss = ({ r, g, b }: Rgb) => `rgb(${Math.round(r)} ${Math.round(g)} ${Math.round(b)})`;
+
+const mixRgb = (a: Rgb, b: Rgb, ratio: number): Rgb => {
+  const t = Math.max(0, Math.min(1, ratio));
+  return {
+    r: clamp255(a.r * (1 - t) + b.r * t),
+    g: clamp255(a.g * (1 - t) + b.g * t),
+    b: clamp255(a.b * (1 - t) + b.b * t),
+  };
+};
+
+const withAlpha = (color: string, alpha: number) => {
+  const rgb = parseColorToRgb(color);
+  if (!rgb) return color;
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${Math.round(rgb.r)}, ${Math.round(rgb.g)}, ${Math.round(rgb.b)}, ${a})`;
+};
+
+const shiftColor = (color: string, amount: number) => {
+  const rgb = parseColorToRgb(color);
+  if (!rgb) return color;
+  const toward = amount >= 0 ? { r: 255, g: 255, b: 255 } : { r: 0, g: 0, b: 0 };
+  const mixed = mixRgb(rgb, toward, Math.abs(amount));
+  return rgbToCss(mixed);
+};
+
+const toLinearChannel = (channel: number) => {
+  const v = channel / 255;
+  return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+};
+
+const relativeLuminance = (color: string) => {
+  const rgb = parseColorToRgb(color);
+  if (!rgb) return null;
+  const r = toLinearChannel(rgb.r);
+  const g = toLinearChannel(rgb.g);
+  const b = toLinearChannel(rgb.b);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const contrastRatio = (fg: string, bg: string) => {
+  const fgL = relativeLuminance(fg);
+  const bgL = relativeLuminance(bg);
+  if (fgL === null || bgL === null) return 1;
+  const lighter = Math.max(fgL, bgL);
+  const darker = Math.min(fgL, bgL);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+const contrastTextColor = (bgColor: string) =>
+  contrastRatio("#ffffff", bgColor) >= contrastRatio("#0f172a", bgColor) ? "#ffffff" : "#0f172a";
+
+const ensureReadableAccent = (accentColor: string, bgColor: string, minRatio = 4.5) =>
+  contrastRatio(accentColor, bgColor) >= minRatio ? accentColor : contrastTextColor(bgColor);
+
+const isDarkSurface = (color: string) => contrastTextColor(color) === "#ffffff";
+
+const isDarkButtonBackground = (bgColor: string) => {
+  const hsl = parseHslParts(bgColor);
+  if (hsl) return hsl.l <= 60;
+  const lum = relativeLuminance(bgColor);
+  if (lum !== null) return lum <= 0.45;
+  return isDarkSurface(bgColor);
+};
+
+const buttonTextColor = (bgColor: string) => {
+  const preferred = isDarkButtonBackground(bgColor) ? "#ffffff" : "#0f172a";
+  if (contrastRatio(preferred, bgColor) >= 4.5) return preferred;
+  const fallback = preferred === "#ffffff" ? "#0f172a" : "#ffffff";
+  return fallback;
+};
+
+const adaptiveButtonPalette = (bgColor: string, minRatio = 4.5): ButtonPalette => {
+  const preferredText = isDarkButtonBackground(bgColor) ? "#ffffff" : "#0f172a";
+  if (contrastRatio(preferredText, bgColor) >= minRatio) {
+    return { background: bgColor, text: preferredText };
+  }
+  return { background: bgColor, text: preferredText };
+};
+
+const deriveThemeColorSystem = (theme: ExtendedThemeConfig, ts: ReturnType<typeof getThemeStyles>, sectionBg: string): ThemeColorSystem => {
+  const pageText = ensureReadableAccent(`hsl(${theme.text_color})`, sectionBg, 4.5);
+  const isDark = isDarkSurface(sectionBg);
+  const surfaceBase = ts.isDark ? withAlpha(ts.secondaryHSL, 0.28) : `hsl(${theme.background_color})`;
+  const surface = contrastRatio(pageText, surfaceBase) >= 4.5 ? surfaceBase : shiftColor(surfaceBase, isDark ? 0.1 : -0.08);
+  const surfaceAlt = shiftColor(surface, isDark ? 0.08 : -0.06);
+  const muted = withAlpha(pageText, isDark ? 0.78 : 0.62);
+  const border = withAlpha(pageText, isDark ? 0.22 : 0.18);
+  const borderStrong = withAlpha(pageText, isDark ? 0.32 : 0.28);
+  const inputBg = shiftColor(surface, isDark ? 0.08 : -0.04);
+  const inputText = contrastTextColor(inputBg);
+  const inputBorder = withAlpha(inputText, isDarkSurface(inputBg) ? 0.38 : 0.24);
+  const placeholder = withAlpha(inputText, isDarkSurface(inputBg) ? 0.6 : 0.5);
+  const primaryButton = adaptiveButtonPalette(ts.primaryHSL);
+
+  return {
+    text: pageText,
+    muted,
+    surface,
+    surfaceAlt,
+    border,
+    borderStrong,
+    inputBg,
+    inputText,
+    inputBorder,
+    placeholder,
+    primaryButton,
+  };
+};
 
 /* ═══════════════════════════════════════════════════════════════════
    HEADER
    ═══════════════════════════════════════════════════════════════════ */
 const FrontendHeader = ({ theme }: { theme: ExtendedThemeConfig }) => {
   const { siteConfig, navItems, contact, updateTheme } = useAdmin();
+  const pathname = usePathname();
+  const previewMode = pathname.startsWith("/preview/");
   const { lang, setLang, lt, t, isRTL } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -155,10 +348,16 @@ const FrontendHeader = ({ theme }: { theme: ExtendedThemeConfig }) => {
 
   const renderLogo = () => {
     if (siteConfig.logo_display_mode === "image" && siteConfig.logo_image) {
-      return <img src={siteConfig.logo_image} alt={siteConfig.logo_text} className="h-8" />;
+      return (
+        <img
+          src={siteConfig.logo_image}
+          alt={siteConfig.logo_text}
+          className="h-14 sm:h-16 lg:h-20 w-auto max-w-[320px] object-contain"
+        />
+      );
     }
     return (
-      <span className="text-xl font-bold tracking-tight" style={{ fontFamily: theme.heading_font }}>
+      <span className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ fontFamily: theme.heading_font }}>
         <span style={{ color: ts.primaryHSL }}>{siteConfig.logo_text.charAt(0)}</span>
         <span style={{ color: headerTextColor }}>{siteConfig.logo_text.slice(1)}</span>
       </span>
@@ -174,7 +373,7 @@ const FrontendHeader = ({ theme }: { theme: ExtendedThemeConfig }) => {
       <header className="fixed top-0 inset-x-0 z-50 transition-all duration-500"
         style={{ background: headerBg, backdropFilter: "blur(12px)", boxShadow: scrolled ? "0 1px 3px rgba(0,0,0,0.06)" : "none", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.05)" : "hsl(220 10% 93%)"}` }}
         dir={isRTL ? "rtl" : "ltr"}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-20 sm:h-24">
           <div className="flex items-center gap-2">{renderLogo()}</div>
           <nav className="hidden lg:flex items-center gap-1">
             {menuNav.map(item => (
@@ -222,7 +421,7 @@ const FrontendHeader = ({ theme }: { theme: ExtendedThemeConfig }) => {
                 <div className="absolute top-full right-0 mt-1 rounded-xl shadow-xl border py-1 min-w-[130px] animate-fade-in z-50"
                   style={{ background: dropdownBg, borderColor: dropdownBorder }}>
                   {currencyOptions.map(c => (
-                    <button key={c.code} onClick={() => { updateTheme({ selected_currency: c.code }); setCurOpen(false); }}
+                    <button key={c.code} onClick={() => { if (!previewMode) updateTheme({ selected_currency: c.code }); setCurOpen(false); }}
                       className="w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between gap-2"
                       style={{ color: theme.selected_currency === c.code ? ts.primaryHSL : headerTextColor, fontWeight: theme.selected_currency === c.code ? 700 : 400 }}>
                       <span className="flex items-center gap-2">
@@ -256,8 +455,8 @@ const FrontendHeader = ({ theme }: { theme: ExtendedThemeConfig }) => {
       {menuOpen && (
         <div className="fixed inset-0 z-40 lg:hidden animate-fade-in">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
-          <div className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} w-80 h-full bg-white shadow-2xl animate-slide-in-right`}
-            style={{ background: isDark ? ts.cardBg : "#fff" }}>
+          <div className={`absolute top-0 ${isRTL ? "left-0" : "right-0"} w-80 h-full shadow-2xl animate-slide-in-right`}
+            style={{ background: ts.cardBg }}>
             <div className="pt-20 p-6 space-y-1">
               {menuNav.map(item => (
                 <a key={item.id} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center justify-between py-3 px-4 rounded-xl text-sm font-medium transition-colors"
@@ -281,7 +480,7 @@ const FrontendHeader = ({ theme }: { theme: ExtendedThemeConfig }) => {
                 <p className="text-xs uppercase tracking-widest px-4 pt-2" style={{ color: isDark ? "#555" : "#94a3b8" }}>Devise</p>
                 <div className="flex gap-2 px-4">
                   {currencyOptions.map(c => (
-                    <button key={c.code} onClick={() => updateTheme({ selected_currency: c.code })}
+                    <button key={c.code} onClick={() => { if (!previewMode) updateTheme({ selected_currency: c.code }); }}
                       className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
                       style={{ background: theme.selected_currency === c.code ? ts.primaryHSL : "transparent", color: theme.selected_currency === c.code ? "#fff" : (isDark ? "#888" : "#64748b") }}>
                       <span>{getCurrencyFlag(c.code)}</span>
@@ -314,7 +513,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   const ts = getThemeStyles(theme);
   const availableCars = cars.filter(c => c.availability_status === "available");
   const lp = theme.landing_page_theme;
-  const curSymbol = getCurrencySymbol(theme, estimation);
+  const curCode = theme.selected_currency;
   const isFlat = theme.flat_design;
   const heroLeft = theme.hero_image_position === "left";
 
@@ -324,13 +523,16 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   const tier = estimation.pricing_tiers.find(t => t.id === selectedTier);
   const days = tier ? Math.ceil((tier.min_days + (tier.max_days || tier.min_days + 10)) / 2) : 5;
   const discount = tier ? tier.discount_percent : 0;
-  const pricePerDay = car ? Math.round(car.price_per_day * (1 - discount / 100)) : 0;
+  const basePricePerDayMad = car ? car.price_per_day * (1 - discount / 100) : 0;
+  const pricePerDay = convertFromMad(basePricePerDayMad, curCode);
+  const total = convertFromMad(basePricePerDayMad * days, curCode);
 
   const generateWhatsAppLink = () => {
     if (!car || !tier) return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}`;
+    const totalText = formatCurrencyAmount(total, curCode);
     let msg = estimation.whatsapp_message_template
       .replace("{vehicle}", car.name).replace("{duration}", String(days))
-      .replace("{total}", String(pricePerDay * days)).replace("{currency}", theme.selected_currency)
+      .replace("{total}", totalText).replace("{currency}", curCode)
       .replace("{city}", estimation.default_city).replace("{date}", "—");
     return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}?text=${encodeURIComponent(msg)}`;
   };
@@ -441,7 +643,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
                   <img src={siteConfig.hero_side_image} alt="Hero" className="w-full h-auto object-cover" style={{ maxHeight: "70vh" }} />
                 </div>
               ) : (
-                <HeroCarShowcase car={availableCars[0]} theme={theme} curSymbol={curSymbol} isFlat={isFlat} />
+                <HeroCarShowcase car={availableCars[0]} theme={theme} isFlat={isFlat} />
               )}
             </div>
           </div>
@@ -453,7 +655,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   // ── ARCTIC: Ultra-minimal centered hero with floating badge ──
   if (lp === "arctic") {
     return (
-      <section id="hero" className="relative min-h-screen flex items-center justify-center pt-20" style={{ background: `linear-gradient(180deg, ${ts.heroBg} 0%, #fff 100%)`, fontFamily: theme.font_family }}>
+      <section id="hero" className="relative min-h-screen flex items-center justify-center pt-20" style={{ background: `linear-gradient(180deg, ${ts.heroBg} 0%, hsl(${theme.background_color}) 100%)`, fontFamily: theme.font_family }}>
         <div className="max-w-4xl mx-auto px-4 text-center space-y-8 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold" style={{ background: `hsl(${theme.primary_color} / 0.08)`, color: ts.primaryHSL }}>
             <Sparkles size={14} /> {badgeText}
@@ -478,13 +680,13 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
             <div className="flex gap-4 justify-center flex-wrap pt-8">
             {availableCars.slice(0, 4).map((c, i) => (
               <div key={c.id} className="w-40 rounded-2xl overflow-hidden border transition-all hover:-translate-y-1 animate-fade-in"
-                style={{ animationDelay: `${i * 0.1 + 0.4}s`, borderColor: "hsl(210 40% 92%)", background: "#fff", boxShadow: isFlat ? "none" : "0 8px 30px -10px rgba(0,0,0,0.08)" }}>
-                <div className="h-24 overflow-hidden" style={{ background: "#f0f7fc" }}>
+                style={{ animationDelay: `${i * 0.1 + 0.4}s`, borderColor: "hsl(210 40% 92%)", background: ts.cardBg, boxShadow: isFlat ? "none" : "0 8px 30px -10px rgba(0,0,0,0.08)" }}>
+                <div className="h-24 overflow-hidden" style={{ background: shiftColor(ts.heroBg, -0.03) }}>
                   {c.images[0] ? <img src={c.images[0]} alt={c.name} className="w-full h-full object-cover" /> : <CarIcon size={32} className="text-slate-200 m-auto mt-6" />}
                 </div>
                 <div className="p-2.5 text-center">
                   <p className="text-[11px] font-bold" style={{ color: ts.heroText }}>{c.name}</p>
-                  <p className="text-xs font-semibold" style={{ color: ts.primaryHSL }}>{curSymbol}{c.price_per_day}{t("per_day")}</p>
+                  <p className="text-xs font-semibold" style={{ color: ts.primaryHSL }}>{formatCurrencyDisplay(convertFromMad(c.price_per_day, curCode), curCode)}{t("per_day")}</p>
                 </div>
               </div>
             ))}
@@ -544,7 +746,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
                   <img src={siteConfig.hero_side_image} alt="Hero" className="w-full h-auto object-cover" style={{ maxHeight: "65vh" }} />
                 </div>
               ) : (
-                <div className="relative"><HeroCarShowcase car={availableCars[0]} theme={theme} curSymbol={curSymbol} isFlat={isFlat} /></div>
+                <div className="relative"><HeroCarShowcase car={availableCars[0]} theme={theme} isFlat={isFlat} /></div>
               )}
             </div>
           </div>
@@ -619,7 +821,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
                     <img src={siteConfig.hero_side_image} alt="Hero" className="w-full h-auto object-contain max-h-[60vh] lg:max-h-[70vh]" />
                   </div>
                 ) : (
-                  <HeroCarShowcase car={availableCars[0]} theme={theme} curSymbol={curSymbol} isFlat={isFlat} />
+                  <HeroCarShowcase car={availableCars[0]} theme={theme} isFlat={isFlat} />
                 )}
               </div>
             )}
@@ -656,7 +858,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
                     <img src={siteConfig.hero_side_image} alt="Hero" className="w-full h-auto object-contain max-h-[60vh] lg:max-h-[70vh]" />
                   </div>
                 ) : (
-                  <HeroCarShowcase car={availableCars[0]} theme={theme} curSymbol={curSymbol} isFlat={isFlat} />
+                  <HeroCarShowcase car={availableCars[0]} theme={theme} isFlat={isFlat} />
                 )}
               </div>
             )}
@@ -668,21 +870,23 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
 
   // Eco theme: centered
   if (lp === "eco") {
+    const ecoBgTop = shiftColor(`hsl(${theme.background_color})`, -0.01);
+    const ecoBgBottom = shiftColor(`hsl(${theme.background_color})`, -0.06);
     return (
-      <section id="hero" className="relative min-h-[90vh] flex items-center pt-20" style={{ background: "linear-gradient(180deg, #f0f7f4 0%, #e8f5e9 100%)", fontFamily: theme.font_family }}>
+      <section id="hero" className="relative min-h-[90vh] flex items-center pt-20" style={{ background: `linear-gradient(180deg, ${ecoBgTop} 0%, ${ecoBgBottom} 100%)`, fontFamily: theme.font_family }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
           <div className="text-center max-w-3xl mx-auto space-y-8 animate-fade-in">
             <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold mx-auto" style={{ background: `hsl(${theme.primary_color} / 0.12)`, color: ts.primaryHSL }}>
               <CheckCircle2 size={14} /> {badgeText}
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.1]" style={{ fontFamily: theme.heading_font, color: "#1a3a2a" }}>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.1]" style={{ fontFamily: theme.heading_font, color: ts.heroText }}>
               {titleParts.map((part, i) => (
                 <span key={i} className="block" style={{ animationDelay: `${i * 0.1}s` }}>
                   {i === 1 ? <span style={{ color: ts.primaryHSL }}>{part}</span> : part}
                 </span>
               ))}
             </h1>
-            <p className="text-lg max-w-lg mx-auto" style={{ color: "#4a6a5a" }}>{lt(config.subtitle)}</p>
+            <p className="text-lg max-w-lg mx-auto" style={{ color: ts.heroMuted }}>{lt(config.subtitle)}</p>
             <div className="flex flex-wrap gap-3 justify-center">
               <a href={primaryCtaHref} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 px-10 py-4 text-sm font-bold text-white rounded-full btn-animated"
@@ -705,7 +909,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
                   </div>
                   <div>
                     <p className="text-xs font-bold" style={{ color: "#1a3a2a" }}>{c.name}</p>
-                    <p className="text-xs font-semibold" style={{ color: ts.primaryHSL }}>{curSymbol}{c.price_per_day}{t("per_day")}</p>
+                    <p className="text-xs font-semibold" style={{ color: ts.primaryHSL }}>{formatCurrencyDisplay(convertFromMad(c.price_per_day, curCode), curCode)}{t("per_day")}</p>
                   </div>
                 </div>
               ))}
@@ -731,18 +935,17 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
         <p className="text-base text-slate-500 mt-4 max-w-md leading-relaxed whitespace-pre-line">{lt(config.subtitle)}</p>
       </div>
       {/* Mini estimation */}
-      {heroConfig.show_mini_estimator && (
+      {heroConfig.show_mini_estimator && (() => {
+        const miniFormBg = ts.cardBg;
+        const miniInputBg = isDarkSurface(miniFormBg) ? "rgba(15,23,42,0.92)" : "#f8fafc";
+        const miniInputText = isDarkSurface(miniInputBg) ? "rgba(248,250,252,0.95)" : "#0f172a";
+        const miniInputBorder = isDarkSurface(miniInputBg) ? "rgba(148,163,184,0.35)" : "hsl(220 10% 82%)";
+        const miniMuted = isDarkSurface(miniFormBg) ? "rgba(203,213,225,0.85)" : "#64748b";
+        const miniCtaText = buttonTextColor(ts.primaryHSL);
+        return (
       <div className="rounded-2xl border p-5 space-y-4 max-w-md animate-fade-in"
-        style={{ animationDelay: "0.3s", background: "#fff", borderColor: "hsl(220 10% 93%)", boxShadow: isFlat ? "none" : "0 20px 40px -15px rgba(0,0,0,0.08)" }}>
-        {(() => {
-          const miniFormBg = "#ffffff";
-          const miniInputBg = isDarkSurface(miniFormBg) ? "rgba(15,23,42,0.92)" : "#f8fafc";
-          const miniInputText = isDarkSurface(miniInputBg) ? "rgba(248,250,252,0.95)" : "#0f172a";
-          const miniInputBorder = isDarkSurface(miniInputBg) ? "rgba(148,163,184,0.35)" : "hsl(220 10% 82%)";
-          const miniMuted = isDarkSurface(miniFormBg) ? "rgba(203,213,225,0.85)" : "#64748b";
-          const miniCtaText = contrastTextColor(ts.primaryHSL);
-          return (
-            <>
+        style={{ animationDelay: "0.3s", background: miniFormBg, borderColor: "hsl(220 10% 93%)", boxShadow: isFlat ? "none" : "0 20px 40px -15px rgba(0,0,0,0.08)" }}>
+        <>
         {estimation.show_vehicle_field && (
           <div>
             <Label className="text-xs font-medium mb-1.5 block" style={{ color: miniMuted }}>{t("select_vehicle")}</Label>
@@ -771,7 +974,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
         {car && (
           <div className="rounded-xl p-4 text-center" style={{ background: `hsl(${theme.primary_color} / 0.06)` }}>
             <p className="text-xs" style={{ color: miniMuted }}>{t("price_per_day")}</p>
-            <p className="text-2xl font-bold mt-1" style={{ color: ts.primaryHSL, fontFamily: theme.heading_font }}>{curSymbol}{pricePerDay} <span className="text-sm font-normal" style={{ color: miniMuted }}>{t("per_day")}</span></p>
+            <p className="text-2xl font-bold mt-1" style={{ color: ts.primaryHSL, fontFamily: theme.heading_font }}>{formatCurrencyDisplay(pricePerDay, curCode)} <span className="text-sm font-normal" style={{ color: miniMuted }}>{t("per_day")}</span></p>
           </div>
         )}
         <a href={primaryCtaHref} target="_blank" rel="noopener noreferrer"
@@ -788,11 +991,10 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
           ))}
         </div>
         )}
-            </>
-          );
-        })()}
+        </>
       </div>
-      )}
+        );
+      })()}
     </div>
   );
 
@@ -806,7 +1008,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
           <img src={siteConfig.hero_side_image} alt="Hero" className="w-full h-auto object-contain max-h-[60vh] lg:max-h-[70vh]" />
         </div>
       ) : (
-        <HeroCarShowcase car={availableCars[0]} theme={theme} curSymbol={curSymbol} isFlat={isFlat} />
+        <HeroCarShowcase car={availableCars[0]} theme={theme} isFlat={isFlat} />
       )}
     </div>
   );
@@ -829,16 +1031,16 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
 };
 
 /* ─── Hero Car Showcase (reusable) ─── */
-const HeroCarShowcase = ({ car, theme, curSymbol, isFlat }: { car?: Car; theme: ExtendedThemeConfig; curSymbol: string; isFlat: boolean }) => {
-  const { estimation } = useAdmin();
+const HeroCarShowcase = ({ car, theme, isFlat }: { car?: Car; theme: ExtendedThemeConfig; isFlat: boolean }) => {
   const { t } = useLanguage();
   const ts = getThemeStyles(theme);
+  const curCode = theme.selected_currency;
 
   if (!car) return null;
 
   return (
     <div className="rounded-3xl p-8 border" style={{
-      background: "#fff",
+      background: ts.cardBg,
       borderColor: "hsl(220 10% 93%)",
       boxShadow: isFlat ? "none" : "0 25px 60px -12px rgba(0,0,0,0.1)",
     }}>
@@ -852,7 +1054,7 @@ const HeroCarShowcase = ({ car, theme, curSymbol, isFlat }: { car?: Car; theme: 
         <span className="flex items-center gap-1"><Users size={13} /> {car.seats}</span>
       </div>
       <p className="text-2xl font-bold mt-3" style={{ color: ts.primaryHSL, fontFamily: theme.heading_font }}>
-        {curSymbol}{car.price_per_day}<span className="text-sm font-normal text-slate-400"> {t("per_day")}</span>
+        {formatCurrencyDisplay(convertFromMad(car.price_per_day, curCode), curCode)}<span className="text-sm font-normal text-slate-400"> {t("per_day")}</span>
       </p>
     </div>
   );
@@ -868,14 +1070,14 @@ const FeaturesSection = ({ config, theme }: { config: ExtendedSectionConfig; the
   const lp = theme.landing_page_theme;
   const isFlat = theme.flat_design;
 
-  const sectionBg = ts.isDark ? ts.sectionAlt : (lp === "eco" ? "#f0f7f4" : lp === "classic" ? ts.sectionAlt : lp === "sunset" ? ts.heroBg : lp === "desert" ? ts.sectionAlt : "#fff");
+  const sectionBg = ts.isDark ? ts.sectionAlt : shiftColor(`hsl(${theme.background_color})`, lp === "eco" ? -0.04 : lp === "classic" ? -0.03 : -0.015);
   const textColor = ts.isDark ? "#fff" : ts.heroText;
   const mutedColor = ts.heroMuted;
 
   // ── SPORTY: Full-width horizontal banner with numbers ──
   if (lp === "sporty") {
     return (
-      <section className="py-0 overflow-hidden" style={{ background: "#0a0a0a", fontFamily: theme.font_family }}>
+      <section className="py-0 overflow-hidden" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
         <div className="border-y border-white/5">
           <div className="grid grid-cols-2 lg:grid-cols-4">
             {features.map((f, i) => (
@@ -969,7 +1171,7 @@ const FeaturesSection = ({ config, theme }: { config: ExtendedSectionConfig; the
             <div className="lg:col-span-8 space-y-6">
               {features.map((f, i) => (
                 <div key={f.id} className="flex items-start gap-5 p-5 rounded-2xl border transition-all hover:-translate-y-0.5 animate-fade-in"
-                  style={{ animationDelay: `${i * 0.1}s`, background: "#fff", borderColor: "hsl(220 10% 92%)", boxShadow: isFlat ? "none" : "0 4px 15px -5px rgba(0,0,0,0.05)" }}>
+                  style={{ animationDelay: `${i * 0.1}s`, background: ts.cardBg, borderColor: "hsl(220 10% 92%)", boxShadow: isFlat ? "none" : "0 4px 15px -5px rgba(0,0,0,0.05)" }}>
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: `hsl(${theme.primary_color} / 0.1)`, color: ts.primaryHSL }}>
                     <DynIcon name={f.icon} size={22} className="text-current" />
                   </div>
@@ -998,7 +1200,7 @@ const FeaturesSection = ({ config, theme }: { config: ExtendedSectionConfig; the
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {features.map((f, i) => (
               <div key={f.id} className="relative overflow-hidden rounded-2xl p-8 border transition-all hover:-translate-y-1 animate-fade-in group"
-                style={{ animationDelay: `${i * 0.1}s`, background: "#fff", borderColor: "hsl(20 20% 92%)", boxShadow: isFlat ? "none" : "0 8px 30px -10px rgba(0,0,0,0.06)" }}>
+                style={{ animationDelay: `${i * 0.1}s`, background: ts.cardBg, borderColor: "hsl(20 20% 92%)", boxShadow: isFlat ? "none" : "0 8px 30px -10px rgba(0,0,0,0.06)" }}>
                 <div className="absolute top-0 left-0 w-1 h-full" style={{ background: ts.primaryHSL }} />
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `hsl(${theme.primary_color} / 0.1)`, color: ts.primaryHSL }}>
@@ -1018,7 +1220,7 @@ const FeaturesSection = ({ config, theme }: { config: ExtendedSectionConfig; the
   // ── ARCTIC: Minimal horizontal list ──
   if (lp === "arctic") {
     return (
-      <section className="py-16 px-5 border-b" style={{ background: "#fff", fontFamily: theme.font_family, borderColor: "hsl(210 40% 94%)" }}>
+      <section className="py-16 px-5 border-b" style={{ background: sectionBg, fontFamily: theme.font_family, borderColor: "hsl(210 40% 94%)" }}>
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row lg:items-stretch gap-0 divide-y lg:divide-y-0 lg:divide-x" style={{ borderColor: "hsl(210 40% 94%)" }}>
             {features.map((f, i) => (
@@ -1046,7 +1248,7 @@ const FeaturesSection = ({ config, theme }: { config: ExtendedSectionConfig; the
           <div className="space-y-4">
             {features.map((f, i) => (
               <div key={f.id} className="flex items-center gap-6 p-6 rounded-2xl border transition-all hover:-translate-x-1 animate-fade-in"
-                style={{ animationDelay: `${i * 0.08}s`, background: "#fff", borderColor: "hsl(30 20% 90%)", boxShadow: isFlat ? "none" : "0 4px 15px -5px rgba(0,0,0,0.05)" }}>
+                style={{ animationDelay: `${i * 0.08}s`, background: ts.cardBg, borderColor: "hsl(30 20% 90%)", boxShadow: isFlat ? "none" : "0 4px 15px -5px rgba(0,0,0,0.05)" }}>
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: `hsl(${theme.primary_color} / 0.1)`, color: ts.primaryHSL }}>
                   <DynIcon name={f.icon} size={24} className="text-current" />
                 </div>
@@ -1091,33 +1293,57 @@ const FeaturesSection = ({ config, theme }: { config: ExtendedSectionConfig; the
    ═══════════════════════════════════════════════════════════════════ */
 const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; theme: ExtendedThemeConfig; cars: Car[] }) => {
   const [bookingCar, setBookingCar] = useState<Car | null>(null);
+  const [bookingDraft, setBookingDraft] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    pickup_date: "",
+    return_date: "",
+  });
+  const [bookingErrors, setBookingErrors] = useState<Partial<Record<"full_name" | "email" | "phone" | "pickup_date" | "return_date", string>>>({});
+  const [bookingConfirmed, setBookingConfirmed] = useState<null | {
+    bookingId: string;
+    carName: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    pickupDate: string;
+    returnDate: string;
+    estimatedDays: number | null;
+    estimatedTotal: string | null;
+  }>(null);
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [bookingSubmitError, setBookingSubmitError] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const { lt, t } = useLanguage();
-  const { estimation, contact, bookingForm } = useAdmin();
+  const { estimation, contact, bookingForm, createBooking } = useAdmin();
   const ts = getThemeStyles(theme);
   const lp = theme.landing_page_theme;
   const isFlat = theme.flat_design;
-  const curSymbol = getCurrencySymbol(theme, estimation);
+  const curCode = theme.selected_currency;
   const variant = theme.card_style_variant;
   const available = cars.filter(c => c.availability_status === "available");
   const categories = useMemo(() => ["all", ...new Set(available.map(c => c.category))], [available]);
   const filtered = activeCategory === "all" ? available : available.filter(c => c.category === activeCategory);
 
-  const bgColor = ts.isDark ? ts.heroBg : (lp === "eco" ? "#e8f5e9" : lp === "classic" ? "#faf8f2" : lp === "sunset" ? ts.heroBg : lp === "arctic" ? ts.heroBg : lp === "desert" ? ts.heroBg : "#fff");
-  const textColor = ts.isDark ? "#fff" : ts.heroText;
-  const mutedColor = ts.isDark ? ts.heroMuted : ts.heroMuted;
-  const cardBorderColor = ts.isDark ? "rgba(255,255,255,0.06)" : "hsl(220 10% 93%)";
-  const cardCtaText = contrastTextColor(ts.primaryHSL);
-  const neutralCardBg = ts.isDark ? ts.cardBg : "#ffffff";
-  const neutralCardText = contrastTextColor(neutralCardBg);
-  const neutralCardMuted = isDarkSurface(neutralCardBg) ? "rgba(203,213,225,0.85)" : "#64748b";
-  const modalBg = ts.isDark ? ts.cardBg : "#ffffff";
-  const modalInputBg = isDarkSurface(modalBg) ? "rgba(15,23,42,0.92)" : "#f8fafc";
-  const modalInputText = isDarkSurface(modalInputBg) ? "rgba(248,250,252,0.95)" : "#0f172a";
-  const modalInputPlaceholder = isDarkSurface(modalInputBg) ? "rgba(148,163,184,0.9)" : "#64748b";
-  const modalInputBorder = isDarkSurface(modalInputBg) ? "rgba(148,163,184,0.35)" : "hsl(220 10% 82%)";
-  const modalLabelColor = isDarkSurface(modalBg) ? "rgba(203,213,225,0.9)" : "#64748b";
-  const modalButtonText = contrastTextColor(ts.primaryHSL);
+  const baseBackground = `hsl(${theme.background_color})`;
+  const bgColor = ts.isDark
+    ? ts.heroBg
+    : shiftColor(baseBackground, lp === "eco" ? -0.05 : lp === "classic" ? -0.03 : 0);
+  const colors = deriveThemeColorSystem(theme, ts, bgColor);
+  const textColor = colors.text;
+  const mutedColor = colors.muted;
+  const cardBorderColor = colors.borderStrong;
+  const primaryButton = colors.primaryButton;
+  const cardCtaText = primaryButton.text;
+  const priceBadgeText = contrastTextColor(primaryButton.background);
+  const modalBg = colors.surface;
+  const modalInputBg = colors.inputBg;
+  const modalInputText = colors.inputText;
+  const modalInputPlaceholder = colors.placeholder;
+  const modalInputBorder = colors.inputBorder;
+  const modalLabelColor = colors.muted;
+  const modalButtonText = primaryButton.text;
   const modalInputStyle = {
     background: modalInputBg,
     borderColor: modalInputBorder,
@@ -1125,29 +1351,148 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
     ["--ds-input-placeholder-color" as any]: modalInputPlaceholder,
   } as React.CSSProperties;
 
+  const resetBookingModalState = () => {
+    setBookingDraft({
+      full_name: "",
+      email: "",
+      phone: "",
+      pickup_date: "",
+      return_date: "",
+    });
+    setBookingErrors({});
+    setBookingConfirmed(null);
+    setBookingSubmitting(false);
+    setBookingSubmitError("");
+  };
+
+  const openBookingModal = (car: Car) => {
+    setBookingCar(car);
+    resetBookingModalState();
+  };
+
+  const validateBookingDraft = () => {
+    const errors: Partial<Record<"full_name" | "email" | "phone" | "pickup_date" | "return_date", string>> = {};
+    const requiredMsg = t("field_required");
+    if (bookingForm.show_name && !bookingDraft.full_name.trim()) errors.full_name = requiredMsg;
+    if (bookingForm.show_email) {
+      if (!bookingDraft.email.trim()) errors.email = requiredMsg;
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingDraft.email.trim())) errors.email = t("invalid_email");
+    }
+    if (bookingForm.show_phone && !bookingDraft.phone.trim()) errors.phone = requiredMsg;
+    if (bookingForm.show_pickup_date && !bookingDraft.pickup_date) errors.pickup_date = requiredMsg;
+    if (bookingForm.show_return_date && !bookingDraft.return_date) errors.return_date = requiredMsg;
+    if (bookingForm.show_pickup_date && bookingForm.show_return_date && bookingDraft.pickup_date && bookingDraft.return_date) {
+      if (new Date(bookingDraft.return_date).getTime() < new Date(bookingDraft.pickup_date).getTime()) {
+        errors.return_date = t("return_after_pickup");
+      }
+    }
+    return errors;
+  };
+
+  const buildBookingWhatsappLink = () => {
+    if (!bookingConfirmed) return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}`;
+    const lines = [
+      t("reservation_whatsapp_intro"),
+      `🧾 ${t("reservation_reference")}: ${bookingConfirmed.bookingId}`,
+      `🚗 ${t("select_vehicle")}: ${bookingConfirmed.carName}`,
+    ];
+    if (bookingConfirmed.fullName) lines.push(`👤 ${t("full_name")}: ${bookingConfirmed.fullName}`);
+    if (bookingConfirmed.phone) lines.push(`📞 ${t("phone")}: ${bookingConfirmed.phone}`);
+    if (bookingConfirmed.email) lines.push(`✉️ ${t("email")}: ${bookingConfirmed.email}`);
+    if (bookingConfirmed.pickupDate) lines.push(`📅 ${t("pickup_date")}: ${bookingConfirmed.pickupDate}`);
+    if (bookingConfirmed.returnDate) lines.push(`📆 ${t("return_date")}: ${bookingConfirmed.returnDate}`);
+    if (bookingConfirmed.estimatedDays && bookingConfirmed.estimatedTotal) {
+      lines.push(`⏱️ ${t("days")}: ${bookingConfirmed.estimatedDays}`);
+      lines.push(`💰 ${t("total_estimated")}: ${bookingConfirmed.estimatedTotal}`);
+    }
+    const msg = lines.join("\n");
+    return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}?text=${encodeURIComponent(msg)}`;
+  };
+
+  const submitBookingDraft = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!bookingCar) return;
+    setBookingSubmitError("");
+    const errors = validateBookingDraft();
+    setBookingErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    let estimatedDays: number | null = null;
+    let estimatedTotal: string | null = null;
+    if (bookingDraft.pickup_date && bookingDraft.return_date) {
+      const dayMs = 24 * 60 * 60 * 1000;
+      const diff = new Date(bookingDraft.return_date).getTime() - new Date(bookingDraft.pickup_date).getTime();
+      estimatedDays = Math.max(1, Math.ceil(diff / dayMs));
+      const total = convertFromMad(bookingCar.price_per_day, curCode) * estimatedDays;
+      estimatedTotal = formatCurrencyDisplay(total, curCode, estimation.currency_symbol);
+    }
+
+    const today = new Date();
+    const todayIso = today.toISOString().slice(0, 10);
+    const tomorrowIso = new Date(today.getTime() + 86400000).toISOString().slice(0, 10);
+    const pickupDate = bookingDraft.pickup_date || todayIso;
+    const returnDate = bookingDraft.return_date || (bookingDraft.pickup_date ? bookingDraft.pickup_date : tomorrowIso);
+    const payload = {
+      customer_name: bookingDraft.full_name.trim(),
+      phone: bookingDraft.phone.trim(),
+      email: bookingDraft.email.trim(),
+      pickup_date: pickupDate,
+      return_date: returnDate,
+      car_id: bookingCar.id,
+    };
+
+    setBookingSubmitting(true);
+    const created = await createBooking(payload);
+    if (!created) {
+      setBookingSubmitError(t("booking_save_failed"));
+      setBookingSubmitting(false);
+      return;
+    }
+    setBookingSubmitting(false);
+
+    setBookingConfirmed({
+      bookingId: created.booking_id,
+      carName: bookingCar.name,
+      fullName: bookingDraft.full_name.trim(),
+      email: bookingDraft.email.trim(),
+      phone: bookingDraft.phone.trim(),
+      pickupDate: bookingDraft.pickup_date,
+      returnDate: bookingDraft.return_date,
+      estimatedDays,
+      estimatedTotal,
+    });
+  };
+
   const renderCard = (car: Car, i: number) => {
     const imgSrc = car.images[0];
     const delay = `${i * 0.05}s`;
+    const carPrice = convertFromMad(car.price_per_day, curCode);
+    const carPriceDisplay = formatCurrencyDisplay(carPrice, curCode, estimation.currency_symbol);
+    const baseCardBg = colors.surface;
+    const baseCardText = contrastTextColor(baseCardBg);
+    const baseCardMuted = colors.muted;
+    const basePriceColor = ensureReadableAccent(ts.primaryHSL, baseCardBg, 3);
 
     if (variant === "minimal") {
+      const minimalPreviewBg = colors.surfaceAlt;
       return (
         <div key={car.id} className="overflow-hidden transition-all duration-300 hover:-translate-y-1 group animate-fade-in rounded-2xl"
-          style={{ animationDelay: delay, background: ts.isDark ? ts.cardBg : "#fff", border: `1px solid ${cardBorderColor}`, boxShadow: isFlat ? "none" : "0 4px 20px -5px rgba(0,0,0,0.08)" }}>
-          <div className="relative h-44 overflow-hidden" style={{ background: ts.isDark ? ts.sectionAlt : "#f8fafc" }}>
-            <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-lg text-xs font-bold text-white" style={{ background: ts.primaryHSL }}>{curSymbol}{car.price_per_day}</div>
+          style={{ animationDelay: delay, background: baseCardBg, border: `1px solid ${cardBorderColor}`, boxShadow: isFlat ? "none" : "0 4px 20px -5px rgba(0,0,0,0.08)" }}>
+          <div className="relative h-44 overflow-hidden" style={{ background: minimalPreviewBg }}>
+            <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-lg text-xs font-bold" style={{ background: primaryButton.background, color: priceBadgeText }}>{carPriceDisplay}</div>
             {imgSrc ? <img src={imgSrc} alt={car.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
               : <div className="w-full h-full flex items-center justify-center"><CarIcon size={48} className="text-slate-200" /></div>}
           </div>
           <div className="p-4">
-            <h3 className="font-bold text-sm" style={{ color: neutralCardText, fontFamily: theme.heading_font }}>{car.name}</h3>
-            <div className="flex items-center gap-3 mt-2 text-xs" style={{ color: neutralCardMuted }}>
+            <h3 className="font-bold text-sm" style={{ color: baseCardText, fontFamily: theme.heading_font }}>{car.name}</h3>
+            <div className="flex items-center gap-3 mt-2 text-xs" style={{ color: baseCardMuted }}>
               <span className="flex items-center gap-1"><Users size={12} /> {car.seats}</span>
               <span className="flex items-center gap-1"><Settings2 size={12} /> {t(car.transmission)}</span>
               <span className="flex items-center gap-1"><Fuel size={12} /> {t(car.fuel_type)}</span>
             </div>
-            <button onClick={() => setBookingCar(car)}
+            <button onClick={() => openBookingModal(car)}
               className="flex items-center justify-center gap-2 w-full mt-3 py-2.5 text-xs font-bold rounded-xl btn-animated"
-              style={{ background: ts.primaryHSL, color: cardCtaText }}>
+              style={{ background: primaryButton.background, color: cardCtaText }}>
               <MessageCircle size={14} style={{ color: cardCtaText }} /> {t("book_this_car")}
             </button>
           </div>
@@ -1156,27 +1501,28 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
     }
 
     if (variant === "luxury") {
+      const luxuryPreviewBg = `linear-gradient(135deg, ${withAlpha(ts.primaryHSL, 0.08)}, ${colors.surfaceAlt})`;
       return (
         <div key={car.id} className="overflow-hidden transition-all duration-300 hover:-translate-y-1 group animate-fade-in rounded-2xl"
-          style={{ animationDelay: delay, background: ts.isDark ? ts.cardBg : "#fff", border: `1px solid ${cardBorderColor}`, boxShadow: isFlat ? "none" : "0 8px 30px -10px rgba(0,0,0,0.1)" }}>
-          <div className="relative h-52 overflow-hidden" style={{ background: `linear-gradient(135deg, hsl(${theme.primary_color} / 0.08), ${ts.isDark ? ts.sectionAlt : "#f1f5f9"})` }}>
+          style={{ animationDelay: delay, background: baseCardBg, border: `1px solid ${cardBorderColor}`, boxShadow: isFlat ? "none" : "0 8px 30px -10px rgba(0,0,0,0.1)" }}>
+          <div className="relative h-52 overflow-hidden" style={{ background: luxuryPreviewBg }}>
             {imgSrc ? <img src={imgSrc} alt={car.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
               : <div className="w-full h-full flex items-center justify-center"><CarIcon size={60} className="text-slate-200" /></div>}
             <div className="absolute bottom-0 inset-x-0 h-20 bg-gradient-to-t from-black/30 to-transparent" />
           </div>
           <div className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-base" style={{ color: neutralCardText, fontFamily: theme.heading_font }}>{car.name}</h3>
-              <p className="font-bold text-lg" style={{ color: ts.primaryHSL }}>{curSymbol}{car.price_per_day}<span className="text-xs font-normal" style={{ color: neutralCardMuted }}>{t("per_day")}</span></p>
+              <h3 className="font-bold text-base" style={{ color: baseCardText, fontFamily: theme.heading_font }}>{car.name}</h3>
+              <p className="font-bold text-lg" style={{ color: basePriceColor }}>{carPriceDisplay}<span className="text-xs font-normal" style={{ color: baseCardMuted }}>{t("per_day")}</span></p>
             </div>
-            <div className="flex items-center gap-3 text-xs" style={{ color: neutralCardMuted }}>
+            <div className="flex items-center gap-3 text-xs" style={{ color: baseCardMuted }}>
               <span className="flex items-center gap-1"><Users size={12} /> {car.seats} {t("seats")}</span>
               <span className="flex items-center gap-1"><Settings2 size={12} /> {t(car.transmission)}</span>
               <span className="flex items-center gap-1"><Fuel size={12} /> {t(car.fuel_type)}</span>
             </div>
-            <button onClick={() => setBookingCar(car)}
+            <button onClick={() => openBookingModal(car)}
               className="flex items-center justify-center gap-2 w-full mt-4 py-3 text-xs font-bold rounded-xl btn-animated"
-              style={{ background: ts.primaryHSL, color: cardCtaText }}>
+              style={{ background: primaryButton.background, color: cardCtaText }}>
               <MessageCircle size={14} style={{ color: cardCtaText }} /> {t("reserve_whatsapp")}
             </button>
           </div>
@@ -1185,23 +1531,27 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
     }
 
     if (variant === "glass") {
+      const glassBg = withAlpha(colors.surface, ts.isDark ? 0.42 : 0.78);
+      const glassText = contrastTextColor(glassBg);
+      const glassMuted = colors.muted;
+      const glassPrice = ensureReadableAccent(ts.primaryHSL, glassBg, 3);
       return (
         <div key={car.id} className="overflow-hidden transition-all duration-300 hover:-translate-y-1 group animate-fade-in rounded-2xl backdrop-blur"
-          style={{ animationDelay: delay, background: ts.isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.7)", border: `1px solid ${ts.isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.5)"}`, boxShadow: isFlat ? "none" : "0 8px 32px rgba(0,0,0,0.06)" }}>
-          <div className="relative h-48 overflow-hidden rounded-t-2xl" style={{ background: ts.isDark ? ts.sectionAlt : "#f0f7f4" }}>
+          style={{ animationDelay: delay, background: glassBg, border: `1px solid ${colors.borderStrong}`, boxShadow: isFlat ? "none" : "0 8px 32px rgba(0,0,0,0.06)" }}>
+          <div className="relative h-48 overflow-hidden rounded-t-2xl" style={{ background: colors.surfaceAlt }}>
             {imgSrc ? <img src={imgSrc} alt={car.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
               : <div className="w-full h-full flex items-center justify-center"><CarIcon size={48} className="text-slate-200" /></div>}
           </div>
           <div className="p-5">
-            <h3 className="font-bold text-sm mb-1" style={{ color: textColor, fontFamily: theme.heading_font }}>{car.name}</h3>
-            <p className="text-lg font-bold mb-2" style={{ color: ts.primaryHSL }}>{curSymbol}{car.price_per_day}<span className="text-xs font-normal" style={{ color: mutedColor }}> {t("per_day")}</span></p>
-            <div className="flex items-center gap-3 text-xs" style={{ color: mutedColor }}>
+            <h3 className="font-bold text-sm mb-1" style={{ color: glassText, fontFamily: theme.heading_font }}>{car.name}</h3>
+            <p className="text-lg font-bold mb-2" style={{ color: glassPrice }}>{carPriceDisplay}<span className="text-xs font-normal" style={{ color: glassMuted }}> {t("per_day")}</span></p>
+            <div className="flex items-center gap-3 text-xs" style={{ color: glassMuted }}>
               <span className="flex items-center gap-1"><Users size={12} /> {car.seats}</span>
               <span className="flex items-center gap-1"><Settings2 size={12} /> {t(car.transmission)}</span>
             </div>
-            <button onClick={() => setBookingCar(car)}
+            <button onClick={() => openBookingModal(car)}
               className="flex items-center justify-center gap-2 w-full mt-4 py-3 text-xs font-bold rounded-xl btn-animated"
-              style={{ background: ts.primaryHSL, color: cardCtaText }}>
+              style={{ background: primaryButton.background, color: cardCtaText }}>
               <MessageCircle size={14} style={{ color: cardCtaText }} /> {t("book_this_car")}
             </button>
           </div>
@@ -1210,31 +1560,35 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
     }
 
     if (variant === "detailed") {
+      const detailedBg = baseCardBg;
+      const detailedText = contrastTextColor(detailedBg);
+      const detailedMuted = colors.muted;
+      const detailedPrice = ensureReadableAccent(ts.primaryHSL, detailedBg, 3);
       return (
         <div key={car.id} className="overflow-hidden transition-all duration-300 hover:-translate-y-1 group animate-fade-in rounded-2xl"
-          style={{ animationDelay: delay, background: "#fff", border: "1px solid hsl(220 10% 93%)", boxShadow: isFlat ? "none" : "0 4px 20px -5px rgba(0,0,0,0.08)" }}>
+          style={{ animationDelay: delay, background: detailedBg, border: `1px solid ${cardBorderColor}`, boxShadow: isFlat ? "none" : "0 4px 20px -5px rgba(0,0,0,0.08)" }}>
           <div className="p-4 pb-2 flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-base" style={{ color: "#0f172a", fontFamily: theme.heading_font }}>{car.name.split(" ")[0]}</h3>
-              <p className="text-[11px]" style={{ color: "#64748b" }}>{car.name.split(" ").slice(1).join(" ") || car.category}</p>
+              <h3 className="font-bold text-base" style={{ color: detailedText, fontFamily: theme.heading_font }}>{car.name.split(" ")[0]}</h3>
+              <p className="text-[11px]" style={{ color: detailedMuted }}>{car.name.split(" ").slice(1).join(" ") || car.category}</p>
             </div>
             <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold border" style={{ borderColor: ts.primaryHSL, color: ts.primaryHSL }}>
               {t("on_demand")}
             </span>
           </div>
-          <div className="h-44 overflow-hidden mx-3 rounded-xl" style={{ background: "#f8fafc" }}>
+          <div className="h-44 overflow-hidden mx-3 rounded-xl" style={{ background: colors.surfaceAlt }}>
             {imgSrc ? <img src={imgSrc} alt={car.name} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 p-2" loading="lazy" />
               : <div className="w-full h-full flex items-center justify-center"><CarIcon size={48} className="text-slate-200" /></div>}
           </div>
           <div className="p-4 pt-3">
-            <p className="text-[10px]" style={{ color: "#64748b" }}>{t("starting_from")}</p>
-            <p className="text-2xl font-bold" style={{ color: "#0f172a", fontFamily: theme.heading_font }}>
-              {car.price_per_day} <span className="text-sm font-normal">{curSymbol}</span>
-              <span className="text-xs font-normal" style={{ color: "#64748b" }}> {t("per_day")}</span>
+            <p className="text-[10px]" style={{ color: detailedMuted }}>{t("starting_from")}</p>
+            <p className="text-2xl font-bold" style={{ color: detailedPrice, fontFamily: theme.heading_font }}>
+              {carPriceDisplay}
+              <span className="text-xs font-normal" style={{ color: detailedMuted }}> {t("per_day")}</span>
             </p>
-            <button onClick={() => setBookingCar(car)}
+            <button onClick={() => openBookingModal(car)}
               className="flex items-center justify-center gap-2 w-full mt-3 py-3 text-xs font-bold rounded-xl btn-animated"
-              style={{ background: ts.primaryHSL, color: cardCtaText }}>
+              style={{ background: primaryButton.background, color: cardCtaText }}>
               <MessageCircle size={14} style={{ color: cardCtaText }} /> {t("reserve_whatsapp")}
             </button>
           </div>
@@ -1243,26 +1597,30 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
     }
 
     // compact (default fallback)
+    const compactBg = baseCardBg;
+    const compactText = contrastTextColor(compactBg);
+    const compactMuted = colors.muted;
+    const compactPrice = ensureReadableAccent(ts.primaryHSL, compactBg, 3);
     return (
       <div key={car.id} className="overflow-hidden transition-all duration-300 hover:-translate-y-1 group animate-fade-in rounded-2xl"
-        style={{ animationDelay: delay, background: "#fff", border: "1px solid hsl(220 10% 93%)", boxShadow: isFlat ? "none" : "0 4px 20px -5px rgba(0,0,0,0.08)" }}>
+        style={{ animationDelay: delay, background: compactBg, border: `1px solid ${cardBorderColor}`, boxShadow: isFlat ? "none" : "0 4px 20px -5px rgba(0,0,0,0.08)" }}>
         <div className="p-4 pb-2 flex items-center justify-between">
           <div>
-            <p className="text-[10px]" style={{ color: "#64748b" }}>{t("starting_from")} *</p>
-            <p className="text-3xl font-bold" style={{ color: "#0f172a", fontFamily: theme.heading_font }}>{car.price_per_day} <span className="text-sm">{curSymbol}</span></p>
+            <p className="text-[10px]" style={{ color: compactMuted }}>{t("starting_from")} *</p>
+            <p className="text-3xl font-bold" style={{ color: compactPrice, fontFamily: theme.heading_font }}>{carPriceDisplay}</p>
           </div>
           <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold border" style={{ borderColor: ts.primaryHSL, color: ts.primaryHSL }}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: ts.primaryHSL }} />
             {t("available")}
           </span>
         </div>
-        <div className="h-40 overflow-hidden mx-3 rounded-xl" style={{ background: `linear-gradient(135deg, hsl(${theme.primary_color} / 0.04), #f8fafc)` }}>
+        <div className="h-40 overflow-hidden mx-3 rounded-xl" style={{ background: `linear-gradient(135deg, ${withAlpha(ts.primaryHSL, 0.04)}, ${colors.surfaceAlt})` }}>
           {imgSrc ? <img src={imgSrc} alt={car.name} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 p-1" loading="lazy" />
             : <div className="w-full h-full flex items-center justify-center"><CarIcon size={48} className="text-slate-200" /></div>}
         </div>
         <div className="p-4 pt-3">
-          <h3 className="font-bold text-base" style={{ color: "#0f172a", fontFamily: theme.heading_font }}>{car.name.split(" ")[0]}</h3>
-          <p className="text-xs" style={{ color: "#64748b" }}>{car.category}</p>
+          <h3 className="font-bold text-base" style={{ color: compactText, fontFamily: theme.heading_font }}>{car.name.split(" ")[0]}</h3>
+          <p className="text-xs" style={{ color: compactMuted }}>{car.category}</p>
           <div className="grid grid-cols-4 gap-2 mt-3 pt-3" style={{ borderTop: `1px solid ${cardBorderColor}` }}>
             {[
               { icon: <Users size={14} />, label: t("seats"), val: String(car.seats) },
@@ -1271,15 +1629,15 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
               { icon: <Fuel size={14} />, label: t("fuel"), val: t(car.fuel_type) },
             ].map((s, j) => (
               <div key={j} className="text-center">
-                <div className="flex justify-center mb-0.5" style={{ color: "#64748b" }}>{s.icon}</div>
-                <p className="text-[9px]" style={{ color: "#64748b" }}>{s.label}</p>
-                <p className="text-[10px] font-bold" style={{ color: "#0f172a" }}>{s.val}</p>
+                <div className="flex justify-center mb-0.5" style={{ color: compactMuted }}>{s.icon}</div>
+                <p className="text-[9px]" style={{ color: compactMuted }}>{s.label}</p>
+                <p className="text-[10px] font-bold" style={{ color: compactText }}>{s.val}</p>
               </div>
             ))}
           </div>
-          <button onClick={() => setBookingCar(car)}
+          <button onClick={() => openBookingModal(car)}
             className="flex items-center justify-center gap-2 w-full mt-4 py-3 text-xs font-bold rounded-xl btn-animated"
-            style={{ background: ts.primaryHSL, color: cardCtaText }}>
+            style={{ background: primaryButton.background, color: cardCtaText }}>
             {t("choose_model")}
           </button>
         </div>
@@ -1299,7 +1657,7 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
           {categories.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)}
               className="px-4 py-2 rounded-full text-xs font-semibold transition-all border btn-animated"
-              style={{ background: activeCategory === cat ? ts.primaryHSL : "transparent", color: activeCategory === cat ? "#fff" : mutedColor, borderColor: activeCategory === cat ? ts.primaryHSL : cardBorderColor }}>
+              style={{ background: activeCategory === cat ? primaryButton.background : "transparent", color: activeCategory === cat ? primaryButton.text : mutedColor, borderColor: activeCategory === cat ? primaryButton.background : cardBorderColor }}>
               {cat === "all" ? t("all_categories") : cat}
             </button>
           ))}
@@ -1310,19 +1668,154 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
       </div>
 
       {/* Booking Modal */}
-      <Dialog open={!!bookingCar} onOpenChange={() => setBookingCar(null)}>
-        <DialogContent className="max-w-sm" style={{ background: modalBg, borderColor: cardBorderColor, color: textColor }}>
-          <DialogHeader><DialogTitle style={{ fontFamily: theme.heading_font }}>{t("book_now")} — {bookingCar?.name}</DialogTitle></DialogHeader>
-          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); setBookingCar(null); }}>
-            {bookingForm.show_name && <div><Label className="text-xs" style={{ color: modalLabelColor }}>{t("full_name")}</Label><Input className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]" style={modalInputStyle} required /></div>}
-            {bookingForm.show_email && <div><Label className="text-xs" style={{ color: modalLabelColor }}>{t("email")}</Label><Input type="email" className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]" style={modalInputStyle} required /></div>}
-            {bookingForm.show_phone && <div><Label className="text-xs" style={{ color: modalLabelColor }}>{t("phone")}</Label><Input className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]" style={modalInputStyle} required /></div>}
-            <div className="grid grid-cols-2 gap-2">
-              {bookingForm.show_pickup_date && <div><Label className="text-xs" style={{ color: modalLabelColor }}>{t("pickup_date")}</Label><Input type="date" className={`mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)] ${isDarkSurface(modalInputBg) ? "[color-scheme:dark]" : "[color-scheme:light]"}`} style={modalInputStyle} required /></div>}
-              {bookingForm.show_return_date && <div><Label className="text-xs" style={{ color: modalLabelColor }}>{t("return_date")}</Label><Input type="date" className={`mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)] ${isDarkSurface(modalInputBg) ? "[color-scheme:dark]" : "[color-scheme:light]"}`} style={modalInputStyle} required /></div>}
+      <Dialog open={!!bookingCar} onOpenChange={(open) => {
+        if (!open) {
+          setBookingCar(null);
+          resetBookingModalState();
+        }
+      }}>
+        <DialogContent
+          className="max-w-md rounded-2xl border shadow-2xl"
+          overlayClassName="bg-slate-900/42 backdrop-blur-[1.5px]"
+          style={{ background: withAlpha(modalBg, 0.96), borderColor: cardBorderColor, color: textColor }}
+        >
+          {!bookingConfirmed ? (
+            <>
+              <DialogHeader className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] font-semibold" style={{ color: mutedColor }}>{t("book_now")}</p>
+                <DialogTitle className="text-2xl leading-tight" style={{ fontFamily: theme.heading_font, color: textColor }}>
+                  {bookingCar?.name}
+                </DialogTitle>
+                <p className="text-sm" style={{ color: mutedColor }}>{t("reservation_form_hint")}</p>
+              </DialogHeader>
+              <form className="space-y-3" onSubmit={submitBookingDraft} noValidate>
+                {bookingForm.show_name && (
+                  <div>
+                    <Label className="text-xs" style={{ color: modalLabelColor }}>{t("full_name")}</Label>
+                    <Input
+                      value={bookingDraft.full_name}
+                      onChange={(e) => setBookingDraft(prev => ({ ...prev, full_name: e.target.value }))}
+                      className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
+                      style={modalInputStyle}
+                    />
+                    {bookingErrors.full_name && <p className="mt-1 text-[11px] text-red-500">{bookingErrors.full_name}</p>}
+                  </div>
+                )}
+                {bookingForm.show_email && (
+                  <div>
+                    <Label className="text-xs" style={{ color: modalLabelColor }}>{t("email")}</Label>
+                    <Input
+                      type="email"
+                      value={bookingDraft.email}
+                      onChange={(e) => setBookingDraft(prev => ({ ...prev, email: e.target.value }))}
+                      className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
+                      style={modalInputStyle}
+                    />
+                    {bookingErrors.email && <p className="mt-1 text-[11px] text-red-500">{bookingErrors.email}</p>}
+                  </div>
+                )}
+                {bookingForm.show_phone && (
+                  <div>
+                    <Label className="text-xs" style={{ color: modalLabelColor }}>{t("phone")}</Label>
+                    <Input
+                      value={bookingDraft.phone}
+                      onChange={(e) => setBookingDraft(prev => ({ ...prev, phone: e.target.value }))}
+                      className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
+                      style={modalInputStyle}
+                    />
+                    {bookingErrors.phone && <p className="mt-1 text-[11px] text-red-500">{bookingErrors.phone}</p>}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  {bookingForm.show_pickup_date && (
+                    <div>
+                      <Label className="text-xs" style={{ color: modalLabelColor }}>{t("pickup_date")}</Label>
+                      <Input
+                        type="date"
+                        value={bookingDraft.pickup_date}
+                        onChange={(e) => setBookingDraft(prev => ({ ...prev, pickup_date: e.target.value }))}
+                        className={`mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)] ${isDarkSurface(modalInputBg) ? "[color-scheme:dark]" : "[color-scheme:light]"}`}
+                        style={modalInputStyle}
+                      />
+                      {bookingErrors.pickup_date && <p className="mt-1 text-[11px] text-red-500">{bookingErrors.pickup_date}</p>}
+                    </div>
+                  )}
+                  {bookingForm.show_return_date && (
+                    <div>
+                      <Label className="text-xs" style={{ color: modalLabelColor }}>{t("return_date")}</Label>
+                      <Input
+                        type="date"
+                        value={bookingDraft.return_date}
+                        onChange={(e) => setBookingDraft(prev => ({ ...prev, return_date: e.target.value }))}
+                        className={`mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)] ${isDarkSurface(modalInputBg) ? "[color-scheme:dark]" : "[color-scheme:light]"}`}
+                        style={modalInputStyle}
+                      />
+                      {bookingErrors.return_date && <p className="mt-1 text-[11px] text-red-500">{bookingErrors.return_date}</p>}
+                    </div>
+                  )}
+                </div>
+                {bookingSubmitError && <p className="text-xs text-red-500">{bookingSubmitError}</p>}
+                <button
+                  type="submit"
+                  disabled={bookingSubmitting}
+                  className="w-full py-3.5 text-sm font-bold rounded-xl btn-animated disabled:opacity-60 disabled:pointer-events-none"
+                  style={{ background: primaryButton.background, color: modalButtonText, boxShadow: isFlat ? "none" : "0 10px 30px -12px rgba(0,0,0,0.35)" }}
+                >
+                  {bookingSubmitting ? t("saving_reservation") : t("confirm_booking")}
+                </button>
+              </form>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <DialogHeader className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] font-semibold" style={{ color: mutedColor }}>{t("thank_you")}</p>
+                <DialogTitle className="text-2xl leading-tight" style={{ fontFamily: theme.heading_font }}>{t("reservation_confirmed_title")}</DialogTitle>
+                <p className="text-sm" style={{ color: mutedColor }}>{t("reservation_confirmed_subtitle")}</p>
+              </DialogHeader>
+              <div className="rounded-2xl border p-4 sm:p-5" style={{ borderColor: cardBorderColor, background: withAlpha(colors.surfaceAlt, 0.8) }}>
+                <div className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm">
+                  <p className="font-medium" style={{ color: mutedColor }}>{t("reservation_reference")}</p>
+                  <p className="font-semibold" style={{ color: textColor }}>{bookingConfirmed.bookingId}</p>
+                  <p className="font-medium" style={{ color: mutedColor }}>{t("select_vehicle")}</p>
+                  <p className="font-semibold" style={{ color: textColor }}>{bookingConfirmed.carName}</p>
+                  {bookingConfirmed.fullName && <><p className="font-medium" style={{ color: mutedColor }}>{t("full_name")}</p><p style={{ color: textColor }}>{bookingConfirmed.fullName}</p></>}
+                  {bookingConfirmed.phone && <><p className="font-medium" style={{ color: mutedColor }}>{t("phone")}</p><p style={{ color: textColor }}>{bookingConfirmed.phone}</p></>}
+                  {bookingConfirmed.email && <><p className="font-medium" style={{ color: mutedColor }}>{t("email")}</p><p style={{ color: textColor }}>{bookingConfirmed.email}</p></>}
+                  {bookingConfirmed.pickupDate && <><p className="font-medium" style={{ color: mutedColor }}>{t("pickup_date")}</p><p style={{ color: textColor }}>{bookingConfirmed.pickupDate}</p></>}
+                  {bookingConfirmed.returnDate && <><p className="font-medium" style={{ color: mutedColor }}>{t("return_date")}</p><p style={{ color: textColor }}>{bookingConfirmed.returnDate}</p></>}
+                  {bookingConfirmed.estimatedTotal && (
+                    <>
+                      <p className="font-medium" style={{ color: mutedColor }}>{t("total_estimated")}</p>
+                      <p style={{ color: textColor }}>
+                        {bookingConfirmed.estimatedTotal}
+                        {bookingConfirmed.estimatedDays ? ` (${bookingConfirmed.estimatedDays} ${t("days")})` : ""}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+              <a
+                href={buildBookingWhatsappLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3.5 text-sm font-bold rounded-xl btn-animated"
+                style={{ background: primaryButton.background, color: modalButtonText, boxShadow: isFlat ? "none" : "0 12px 32px -12px rgba(0,0,0,0.35)" }}
+              >
+                <MessageCircle size={16} style={{ color: modalButtonText }} /> {t("send_reservation_whatsapp")}
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  setBookingCar(null);
+                  resetBookingModalState();
+                }}
+                className="w-full py-2.5 text-sm font-semibold rounded-xl border"
+                style={{ borderColor: cardBorderColor, color: textColor }}
+              >
+                {t("close")}
+              </button>
             </div>
-            <button type="submit" className="w-full py-3 text-sm font-bold rounded-xl btn-animated" style={{ background: ts.primaryHSL, color: modalButtonText }}>{t("confirm_booking")}</button>
-          </form>
+          )}
         </DialogContent>
       </Dialog>
     </section>
@@ -1333,46 +1826,66 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
    ESTIMATION CALCULATOR
    ═══════════════════════════════════════════════════════════════════ */
 const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: ExtendedThemeConfig }) => {
-  const { estimation, cars, contact, cities: adminCities } = useAdmin();
-  const { lt, t, isRTL } = useLanguage();
+  const { estimation, cars, contact, cities: adminCities, bookingForm, createBooking } = useAdmin();
+  const { lt, t, isRTL, lang } = useLanguage();
   const ts = getThemeStyles(theme);
   const lp = theme.landing_page_theme;
   const isFlat = theme.flat_design;
-  const curSymbol = getCurrencySymbol(theme, estimation);
+  const curCode = theme.selected_currency;
 
   const [selectedCity, setSelectedCity] = useState(estimation.default_city);
   const [selectedTier, setSelectedTier] = useState(estimation.pricing_tiers[0]?.id || "");
   const [selectedCarId, setSelectedCarId] = useState("");
   const [desiredDate, setDesiredDate] = useState("");
+  const [insuranceModalOpen, setInsuranceModalOpen] = useState(false);
+  const [reservationModalOpen, setReservationModalOpen] = useState(false);
+  const [reservationCar, setReservationCar] = useState<Car | null>(null);
+  const [reservationDraft, setReservationDraft] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    pickup_date: "",
+    return_date: "",
+  });
+  const [reservationErrors, setReservationErrors] = useState<Partial<Record<"full_name" | "email" | "phone" | "pickup_date" | "return_date", string>>>({});
+  const [reservationConfirmed, setReservationConfirmed] = useState<null | {
+    bookingId: string;
+    carName: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    pickupDate: string;
+    returnDate: string;
+    estimatedDays: number | null;
+    estimatedTotal: string | null;
+  }>(null);
+  const [reservationSubmitting, setReservationSubmitting] = useState(false);
+  const [reservationSubmitError, setReservationSubmitError] = useState("");
 
   const availableCars = cars.filter(c => c.availability_status === "available");
   const tier = estimation.pricing_tiers.find(t => t.id === selectedTier);
   const car = availableCars.find(c => c.id === selectedCarId);
   const days = tier ? Math.ceil((tier.min_days + (tier.max_days || tier.min_days + 10)) / 2) : 5;
   const discount = tier ? tier.discount_percent : 0;
-  const pricePerDay = car ? Math.round(car.price_per_day * (1 - discount / 100)) : 0;
-  const total = pricePerDay * days;
+  const basePricePerDayMad = car ? car.price_per_day * (1 - discount / 100) : 0;
+  const pricePerDay = convertFromMad(basePricePerDayMad, curCode);
+  const total = convertFromMad(basePricePerDayMad * days, curCode);
 
-  const generateWhatsAppLink = () => {
-    if (!car || !tier) return "#";
-    let msg = estimation.whatsapp_message_template
-      .replace("{vehicle}", car.name).replace("{duration}", String(days))
-      .replace("{total}", String(total)).replace("{currency}", theme.selected_currency)
-      .replace("{city}", selectedCity).replace("{date}", desiredDate || "—");
-    return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}?text=${encodeURIComponent(msg)}`;
-  };
-
-  const sectionBg = ts.isDark ? ts.sectionAlt : (lp === "eco" ? "#f0f7f4" : lp === "classic" ? "#f5f0e6" : ts.sectionAlt);
-  const textColor = ts.isDark ? "#fff" : ts.heroText;
-  const mutedColor = ts.heroMuted;
-  const formBg = ts.isDark ? ts.cardBg : "#fff";
-  const formBorder = ts.isDark ? "rgba(255,255,255,0.06)" : "hsl(220 10% 93%)";
-  const formLabelColor = isDarkSurface(formBg) ? "rgba(226,232,240,0.88)" : "#64748b";
-  const formMetaColor = isDarkSurface(formBg) ? "rgba(203,213,225,0.82)" : "#64748b";
-  const formInputBg = isDarkSurface(formBg) ? "rgba(15,23,42,0.92)" : "#f8fafc";
-  const formInputText = isDarkSurface(formInputBg) ? "rgba(248,250,252,0.95)" : "#0f172a";
-  const formPlaceholder = isDarkSurface(formInputBg) ? "rgba(148,163,184,0.9)" : "#64748b";
-  const formInputBorder = isDarkSurface(formInputBg) ? "rgba(148,163,184,0.35)" : "hsl(220 10% 82%)";
+  const baseBackground = `hsl(${theme.background_color})`;
+  const sectionBg = ts.isDark
+    ? ts.sectionAlt
+    : shiftColor(baseBackground, lp === "eco" ? -0.04 : lp === "classic" ? -0.03 : -0.015);
+  const colors = deriveThemeColorSystem(theme, ts, sectionBg);
+  const textColor = colors.text;
+  const mutedColor = colors.muted;
+  const formBg = colors.surface;
+  const formBorder = colors.borderStrong;
+  const formLabelColor = colors.muted;
+  const formMetaColor = colors.muted;
+  const formInputBg = colors.inputBg;
+  const formInputText = colors.inputText;
+  const formPlaceholder = colors.placeholder;
+  const formInputBorder = colors.inputBorder;
   const selectInputStyle = {
     background: formInputBg,
     borderColor: formInputBorder,
@@ -1380,8 +1893,15 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
     ["--ds-select-value-color" as any]: formInputText,
     ["--ds-select-placeholder-color" as any]: formPlaceholder,
   } as React.CSSProperties;
-  const ctaTextColor = contrastTextColor(ts.primaryHSL);
+  const estimationButton = colors.primaryButton;
+  const ctaTextColor = estimationButton.text;
   const dateInputStyle = {
+    background: formInputBg,
+    borderColor: formInputBorder,
+    color: formInputText,
+    ["--ds-input-placeholder-color" as any]: formPlaceholder,
+  } as React.CSSProperties;
+  const modalInputStyle = {
     background: formInputBg,
     borderColor: formInputBorder,
     color: formInputText,
@@ -1391,6 +1911,192 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
   const safeSelectedCity = enabledCityValues.includes(selectedCity) ? selectedCity : undefined;
   const availableCarIds = availableCars.map(c => c.id);
   const safeSelectedCarId = availableCarIds.includes(selectedCarId) ? selectedCarId : undefined;
+  let estimationContent: Record<string, unknown> = {};
+  try { estimationContent = config.content ? JSON.parse(config.content) : {}; } catch { estimationContent = {}; }
+  const insuranceModalRaw = ((estimationContent as { insurance_modal?: unknown }).insurance_modal ?? {}) as Record<string, unknown>;
+  const buttonLabelRaw = estimationContent.button_label;
+  const confirmButtonLabel = (() => {
+    if (typeof buttonLabelRaw === "string" && buttonLabelRaw.trim()) return buttonLabelRaw.trim();
+    if (buttonLabelRaw && typeof buttonLabelRaw === "object") {
+      const localized = buttonLabelRaw as Partial<Record<Language, string>>;
+      return (localized[lang] || localized.fr || localized.en || "").trim() || t("confirm_whatsapp");
+    }
+    return t("confirm_whatsapp");
+  })();
+  const insuranceLabels = {
+    with_caution_title: { fr: "Avec caution :", en: "With deposit:", ar: "مع وديعة:" },
+    without_caution_title: { fr: "Sans caution :", en: "Without deposit:", ar: "بدون وديعة:" },
+  } as const;
+  const getLocalizedModalText = (raw: unknown, fallback: string) => {
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+    if (raw && typeof raw === "object") {
+      const localized = raw as Partial<Record<Language, string>>;
+      return (localized[lang] || localized.fr || localized.en || "").trim() || fallback;
+    }
+    return fallback;
+  };
+  const parseBulletLines = (text: string) =>
+    text
+      .split("\n")
+      .map((line) => line.replace(/^[\s\-•]+/, "").trim())
+      .filter(Boolean);
+  const insuranceModalTitle = getLocalizedModalText(
+    insuranceModalRaw.title,
+    lang === "fr" ? "Assurance & Caution - Informations importantes" : lang === "ar" ? "التأمين والوديعة - معلومات مهمة" : "Insurance & Deposit - Important Information",
+  );
+  const insuranceModalDescription = getLocalizedModalText(
+    insuranceModalRaw.description,
+    lang === "fr"
+      ? "Pour certaines voitures, une caution (dépôt de garantie) est demandée lors de la prise du véhicule."
+      : lang === "ar"
+      ? "لبعض السيارات، تُطلب وديعة (تأمين) عند استلام المركبة."
+      : "For some cars, a security deposit is required at pickup.",
+  );
+  const withCautionLines = parseBulletLines(
+    getLocalizedModalText(
+      insuranceModalRaw.with_caution,
+      lang === "fr"
+        ? "Une caution est déposée (ex : 500 €)\nLa caution est restituée si le véhicule est rendu en bon état\nLe prix de location est plus avantageux"
+        : lang === "ar"
+        ? "يتم إيداع وديعة (مثال: 500€)\nتُعاد الوديعة إذا تم إرجاع السيارة بحالة جيدة\nسعر الإيجار يكون أكثر فائدة"
+        : "A deposit is paid (e.g. 500 EUR)\nThe deposit is refunded if the vehicle is returned in good condition\nRental price is usually lower",
+    ),
+  );
+  const withoutCautionLines = parseBulletLines(
+    getLocalizedModalText(
+      insuranceModalRaw.without_caution,
+      lang === "fr"
+        ? "Aucune caution demandée\nLe prix de location est plus élevé"
+        : lang === "ar"
+        ? "لا توجد وديعة مطلوبة\nسعر الإيجار يكون أعلى"
+        : "No deposit required\nRental price is higher",
+    ),
+  );
+  const insuranceModalButtonLabel = getLocalizedModalText(
+    insuranceModalRaw.button_label,
+    lang === "fr" ? "Assurance & caution" : lang === "ar" ? "التأمين والوديعة" : "Insurance & deposit",
+  );
+  const openReservationModal = () => {
+    if (!car) return;
+    const pickupDate = desiredDate || "";
+    const returnDate = pickupDate
+      ? new Date(new Date(pickupDate).getTime() + Math.max(days - 1, 0) * 86400000).toISOString().slice(0, 10)
+      : "";
+    setReservationCar(car);
+    setReservationDraft({
+      full_name: "",
+      email: "",
+      phone: "",
+      pickup_date: pickupDate,
+      return_date: returnDate,
+    });
+    setReservationErrors({});
+    setReservationConfirmed(null);
+    setReservationSubmitting(false);
+    setReservationSubmitError("");
+    setReservationModalOpen(true);
+  };
+  const resetReservationModalState = () => {
+    setReservationDraft({
+      full_name: "",
+      email: "",
+      phone: "",
+      pickup_date: "",
+      return_date: "",
+    });
+    setReservationErrors({});
+    setReservationConfirmed(null);
+    setReservationSubmitting(false);
+    setReservationSubmitError("");
+  };
+  const validateReservationDraft = () => {
+    const errors: Partial<Record<"full_name" | "email" | "phone" | "pickup_date" | "return_date", string>> = {};
+    const requiredMsg = t("field_required");
+    if (bookingForm.show_name && !reservationDraft.full_name.trim()) errors.full_name = requiredMsg;
+    if (bookingForm.show_email) {
+      if (!reservationDraft.email.trim()) errors.email = requiredMsg;
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reservationDraft.email.trim())) errors.email = t("invalid_email");
+    }
+    if (bookingForm.show_phone && !reservationDraft.phone.trim()) errors.phone = requiredMsg;
+    if (bookingForm.show_pickup_date && !reservationDraft.pickup_date) errors.pickup_date = requiredMsg;
+    if (bookingForm.show_return_date && !reservationDraft.return_date) errors.return_date = requiredMsg;
+    if (bookingForm.show_pickup_date && bookingForm.show_return_date && reservationDraft.pickup_date && reservationDraft.return_date) {
+      if (new Date(reservationDraft.return_date).getTime() < new Date(reservationDraft.pickup_date).getTime()) {
+        errors.return_date = t("return_after_pickup");
+      }
+    }
+    return errors;
+  };
+  const buildReservationWhatsappLink = () => {
+    if (!reservationConfirmed) return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}`;
+    const lines = [
+      t("reservation_whatsapp_intro"),
+      `🧾 ${t("reservation_reference")}: ${reservationConfirmed.bookingId}`,
+      `🚗 ${t("select_vehicle")}: ${reservationConfirmed.carName}`,
+    ];
+    if (reservationConfirmed.fullName) lines.push(`👤 ${t("full_name")}: ${reservationConfirmed.fullName}`);
+    if (reservationConfirmed.phone) lines.push(`📞 ${t("phone")}: ${reservationConfirmed.phone}`);
+    if (reservationConfirmed.email) lines.push(`✉️ ${t("email")}: ${reservationConfirmed.email}`);
+    if (reservationConfirmed.pickupDate) lines.push(`📅 ${t("pickup_date")}: ${reservationConfirmed.pickupDate}`);
+    if (reservationConfirmed.returnDate) lines.push(`📆 ${t("return_date")}: ${reservationConfirmed.returnDate}`);
+    if (reservationConfirmed.estimatedDays && reservationConfirmed.estimatedTotal) {
+      lines.push(`⏱️ ${t("days")}: ${reservationConfirmed.estimatedDays}`);
+      lines.push(`💰 ${t("total_estimated")}: ${reservationConfirmed.estimatedTotal}`);
+    }
+    const msg = lines.join("\n");
+    return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}?text=${encodeURIComponent(msg)}`;
+  };
+  const submitReservationDraft = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!reservationCar) return;
+    setReservationSubmitError("");
+    const errors = validateReservationDraft();
+    setReservationErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    let estimatedDays: number | null = null;
+    let estimatedTotal: string | null = null;
+    if (reservationDraft.pickup_date && reservationDraft.return_date) {
+      const dayMs = 24 * 60 * 60 * 1000;
+      const diff = new Date(reservationDraft.return_date).getTime() - new Date(reservationDraft.pickup_date).getTime();
+      estimatedDays = Math.max(1, Math.ceil(diff / dayMs));
+      const computedTotal = convertFromMad(reservationCar.price_per_day, curCode) * estimatedDays;
+      estimatedTotal = formatCurrencyDisplay(computedTotal, curCode, estimation.currency_symbol);
+    }
+
+    const today = new Date();
+    const todayIso = today.toISOString().slice(0, 10);
+    const tomorrowIso = new Date(today.getTime() + 86400000).toISOString().slice(0, 10);
+    const pickupDate = reservationDraft.pickup_date || todayIso;
+    const returnDate = reservationDraft.return_date || (reservationDraft.pickup_date ? reservationDraft.pickup_date : tomorrowIso);
+
+    setReservationSubmitting(true);
+    const created = await createBooking({
+      customer_name: reservationDraft.full_name.trim(),
+      phone: reservationDraft.phone.trim(),
+      email: reservationDraft.email.trim(),
+      pickup_date: pickupDate,
+      return_date: returnDate,
+      car_id: reservationCar.id,
+    });
+    if (!created) {
+      setReservationSubmitError(t("booking_save_failed"));
+      setReservationSubmitting(false);
+      return;
+    }
+    setReservationSubmitting(false);
+    setReservationConfirmed({
+      bookingId: created.booking_id,
+      carName: reservationCar.name,
+      fullName: reservationDraft.full_name.trim(),
+      email: reservationDraft.email.trim(),
+      phone: reservationDraft.phone.trim(),
+      pickupDate: reservationDraft.pickup_date,
+      returnDate: reservationDraft.return_date,
+      estimatedDays,
+      estimatedTotal,
+    });
+  };
 
   return (
     <section id="estimation" className="py-16 px-5" style={{ background: sectionBg, fontFamily: theme.font_family }}>
@@ -1430,7 +2136,7 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
                   {estimation.pricing_tiers.map(pt => (
                     <button key={pt.id} onClick={() => setSelectedTier(pt.id)}
                       className="py-3 rounded-xl text-xs font-semibold transition-all border btn-animated"
-                      style={{ background: selectedTier === pt.id ? ts.primaryHSL : formInputBg, color: selectedTier === pt.id ? ctaTextColor : formMetaColor, borderColor: selectedTier === pt.id ? ts.primaryHSL : formInputBorder }}>
+                      style={{ background: selectedTier === pt.id ? estimationButton.background : formInputBg, color: selectedTier === pt.id ? ctaTextColor : formMetaColor, borderColor: selectedTier === pt.id ? estimationButton.background : formInputBorder }}>
                       {lt(pt.label)}
                       {pt.discount_percent > 0 && <span className="block text-[10px] mt-0.5 opacity-70">-{pt.discount_percent}%</span>}
                     </button>
@@ -1475,18 +2181,29 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
             {car && (
               <div className="rounded-xl p-5 text-center animate-fade-in" style={{ background: `hsl(${theme.primary_color} / ${ts.isDark ? "0.15" : "0.06"})` }}>
                 <p className="text-xs" style={{ color: formMetaColor }}>{t("price_per_day")}</p>
-                <p className="text-3xl font-bold mt-1" style={{ color: ts.primaryHSL, fontFamily: theme.heading_font }}>{curSymbol}{pricePerDay} <span className="text-sm font-normal" style={{ color: formMetaColor }}>{t("per_day")}</span></p>
+                <p className="text-3xl font-bold mt-1" style={{ color: ts.primaryHSL, fontFamily: theme.heading_font }}>{formatCurrencyDisplay(pricePerDay, curCode, estimation.currency_symbol)} <span className="text-sm font-normal" style={{ color: formMetaColor }}>{t("per_day")}</span></p>
                 <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${formBorder}` }}>
                   <p className="text-xs" style={{ color: formMetaColor }}>{t("total_estimated")} ({days} {t("days")})</p>
-                  <p className="text-4xl font-bold mt-1" style={{ color: ts.primaryHSL, fontFamily: theme.heading_font }}>{curSymbol}{total}</p>
+                  <p className="text-4xl font-bold mt-1" style={{ color: ts.primaryHSL, fontFamily: theme.heading_font }}>{formatCurrencyDisplay(total, curCode, estimation.currency_symbol)}</p>
                 </div>
               </div>
             )}
-            <a href={generateWhatsAppLink()} target="_blank" rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => setInsuranceModalOpen(true)}
+              className="flex items-center justify-center gap-2 w-full py-2 text-sm font-semibold underline underline-offset-2"
+              style={{ color: formMetaColor }}
+            >
+              <Info size={16} /> {insuranceModalButtonLabel}
+            </button>
+            <button
+              type="button"
+              onClick={openReservationModal}
               className={`flex items-center justify-center gap-2 w-full py-4 text-sm font-bold rounded-xl btn-animated ${!car ? "opacity-70 pointer-events-none" : ""}`}
-              style={{ background: ts.primaryHSL, color: ctaTextColor }}>
-              <MessageCircle size={18} style={{ color: ctaTextColor }} /> {t("confirm_whatsapp")}
-            </a>
+              style={{ background: estimationButton.background, color: ctaTextColor }}
+            >
+              <MessageCircle size={18} style={{ color: ctaTextColor }} /> {confirmButtonLabel}
+            </button>
           </div>
           <div className="px-6 pb-5">
             <div className="flex flex-wrap gap-3 justify-center">
@@ -1499,6 +2216,208 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
           </div>
         </div>
       </div>
+      <Dialog open={insuranceModalOpen} onOpenChange={setInsuranceModalOpen}>
+        <DialogContent
+          className="rounded-3xl border p-0 overflow-hidden"
+          style={{ background: formBg, borderColor: formBorder }}
+        >
+          <div className="p-6 sm:p-7 space-y-5">
+            <DialogHeader className="space-y-3">
+              <DialogTitle className="text-3xl leading-tight font-bold" style={{ color: textColor, fontFamily: theme.heading_font }}>
+                {insuranceModalTitle}
+              </DialogTitle>
+              <p className="text-base" style={{ color: mutedColor }}>{insuranceModalDescription}</p>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="rounded-2xl p-4 space-y-2" style={{ background: withAlpha(colors.surfaceAlt, 0.8) }}>
+                <p className="text-lg font-bold" style={{ color: textColor }}>{insuranceLabels.with_caution_title[lang]}</p>
+                <ul className="space-y-1.5">
+                  {withCautionLines.map((line, i) => (
+                    <li key={`with-${i}`} className="text-sm flex gap-2" style={{ color: mutedColor }}>
+                      <span aria-hidden="true">-</span>
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-2xl p-4 space-y-2" style={{ background: withAlpha(colors.surfaceAlt, 0.8) }}>
+                <p className="text-lg font-bold" style={{ color: textColor }}>{insuranceLabels.without_caution_title[lang]}</p>
+                <ul className="space-y-1.5">
+                  {withoutCautionLines.map((line, i) => (
+                    <li key={`without-${i}`} className="text-sm flex gap-2" style={{ color: mutedColor }}>
+                      <span aria-hidden="true">-</span>
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setInsuranceModalOpen(false)}
+              className="w-full py-3 text-sm font-bold rounded-xl btn-animated"
+              style={{ background: estimationButton.background, color: ctaTextColor }}
+            >
+              {t("close")}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={reservationModalOpen}
+        onOpenChange={(open) => {
+          setReservationModalOpen(open);
+          if (!open) {
+            setReservationCar(null);
+            resetReservationModalState();
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-md rounded-2xl border shadow-2xl"
+          overlayClassName="bg-slate-900/42 backdrop-blur-[1.5px]"
+          style={{ background: withAlpha(formBg, 0.96), borderColor: formBorder, color: textColor }}
+        >
+          {!reservationConfirmed ? (
+            <>
+              <DialogHeader className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] font-semibold" style={{ color: mutedColor }}>{t("book_now")}</p>
+                <DialogTitle className="text-2xl leading-tight" style={{ fontFamily: theme.heading_font, color: textColor }}>
+                  {reservationCar?.name || t("select_vehicle")}
+                </DialogTitle>
+                <p className="text-sm" style={{ color: mutedColor }}>{t("reservation_form_hint")}</p>
+              </DialogHeader>
+              <form className="space-y-3" onSubmit={submitReservationDraft} noValidate>
+                {bookingForm.show_name && (
+                  <div>
+                    <Label className="text-xs" style={{ color: formLabelColor }}>{t("full_name")}</Label>
+                    <Input
+                      value={reservationDraft.full_name}
+                      onChange={(e) => setReservationDraft(prev => ({ ...prev, full_name: e.target.value }))}
+                      className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
+                      style={modalInputStyle}
+                    />
+                    {reservationErrors.full_name && <p className="mt-1 text-[11px] text-red-500">{reservationErrors.full_name}</p>}
+                  </div>
+                )}
+                {bookingForm.show_email && (
+                  <div>
+                    <Label className="text-xs" style={{ color: formLabelColor }}>{t("email")}</Label>
+                    <Input
+                      type="email"
+                      value={reservationDraft.email}
+                      onChange={(e) => setReservationDraft(prev => ({ ...prev, email: e.target.value }))}
+                      className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
+                      style={modalInputStyle}
+                    />
+                    {reservationErrors.email && <p className="mt-1 text-[11px] text-red-500">{reservationErrors.email}</p>}
+                  </div>
+                )}
+                {bookingForm.show_phone && (
+                  <div>
+                    <Label className="text-xs" style={{ color: formLabelColor }}>{t("phone")}</Label>
+                    <Input
+                      value={reservationDraft.phone}
+                      onChange={(e) => setReservationDraft(prev => ({ ...prev, phone: e.target.value }))}
+                      className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
+                      style={modalInputStyle}
+                    />
+                    {reservationErrors.phone && <p className="mt-1 text-[11px] text-red-500">{reservationErrors.phone}</p>}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  {bookingForm.show_pickup_date && (
+                    <div>
+                      <Label className="text-xs" style={{ color: formLabelColor }}>{t("pickup_date")}</Label>
+                      <Input
+                        type="date"
+                        value={reservationDraft.pickup_date}
+                        onChange={(e) => setReservationDraft(prev => ({ ...prev, pickup_date: e.target.value }))}
+                        className={`mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)] ${isDarkSurface(formInputBg) ? "[color-scheme:dark]" : "[color-scheme:light]"}`}
+                        style={modalInputStyle}
+                      />
+                      {reservationErrors.pickup_date && <p className="mt-1 text-[11px] text-red-500">{reservationErrors.pickup_date}</p>}
+                    </div>
+                  )}
+                  {bookingForm.show_return_date && (
+                    <div>
+                      <Label className="text-xs" style={{ color: formLabelColor }}>{t("return_date")}</Label>
+                      <Input
+                        type="date"
+                        value={reservationDraft.return_date}
+                        onChange={(e) => setReservationDraft(prev => ({ ...prev, return_date: e.target.value }))}
+                        className={`mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)] ${isDarkSurface(formInputBg) ? "[color-scheme:dark]" : "[color-scheme:light]"}`}
+                        style={modalInputStyle}
+                      />
+                      {reservationErrors.return_date && <p className="mt-1 text-[11px] text-red-500">{reservationErrors.return_date}</p>}
+                    </div>
+                  )}
+                </div>
+                {reservationSubmitError && <p className="text-xs text-red-500">{reservationSubmitError}</p>}
+                <button
+                  type="submit"
+                  disabled={reservationSubmitting}
+                  className="w-full py-3.5 text-sm font-bold rounded-xl btn-animated disabled:opacity-60 disabled:pointer-events-none"
+                  style={{ background: estimationButton.background, color: ctaTextColor, boxShadow: isFlat ? "none" : "0 10px 30px -12px rgba(0,0,0,0.35)" }}
+                >
+                  {reservationSubmitting ? t("saving_reservation") : t("confirm_booking")}
+                </button>
+              </form>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <DialogHeader className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.16em] font-semibold" style={{ color: mutedColor }}>{t("thank_you")}</p>
+                <DialogTitle className="text-2xl leading-tight" style={{ fontFamily: theme.heading_font }}>{t("reservation_confirmed_title")}</DialogTitle>
+                <p className="text-sm" style={{ color: mutedColor }}>{t("reservation_confirmed_subtitle")}</p>
+              </DialogHeader>
+              <div className="rounded-2xl border p-4 sm:p-5" style={{ borderColor: formBorder, background: withAlpha(colors.surfaceAlt, 0.8) }}>
+                <div className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm">
+                  <p className="font-medium" style={{ color: mutedColor }}>{t("reservation_reference")}</p>
+                  <p className="font-semibold" style={{ color: textColor }}>{reservationConfirmed.bookingId}</p>
+                  <p className="font-medium" style={{ color: mutedColor }}>{t("select_vehicle")}</p>
+                  <p className="font-semibold" style={{ color: textColor }}>{reservationConfirmed.carName}</p>
+                  {reservationConfirmed.fullName && <><p className="font-medium" style={{ color: mutedColor }}>{t("full_name")}</p><p style={{ color: textColor }}>{reservationConfirmed.fullName}</p></>}
+                  {reservationConfirmed.phone && <><p className="font-medium" style={{ color: mutedColor }}>{t("phone")}</p><p style={{ color: textColor }}>{reservationConfirmed.phone}</p></>}
+                  {reservationConfirmed.email && <><p className="font-medium" style={{ color: mutedColor }}>{t("email")}</p><p style={{ color: textColor }}>{reservationConfirmed.email}</p></>}
+                  {reservationConfirmed.pickupDate && <><p className="font-medium" style={{ color: mutedColor }}>{t("pickup_date")}</p><p style={{ color: textColor }}>{reservationConfirmed.pickupDate}</p></>}
+                  {reservationConfirmed.returnDate && <><p className="font-medium" style={{ color: mutedColor }}>{t("return_date")}</p><p style={{ color: textColor }}>{reservationConfirmed.returnDate}</p></>}
+                  {reservationConfirmed.estimatedTotal && (
+                    <>
+                      <p className="font-medium" style={{ color: mutedColor }}>{t("total_estimated")}</p>
+                      <p style={{ color: textColor }}>
+                        {reservationConfirmed.estimatedTotal}
+                        {reservationConfirmed.estimatedDays ? ` (${reservationConfirmed.estimatedDays} ${t("days")})` : ""}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+              <a
+                href={buildReservationWhatsappLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3.5 text-sm font-bold rounded-xl btn-animated"
+                style={{ background: estimationButton.background, color: ctaTextColor, boxShadow: isFlat ? "none" : "0 12px 32px -12px rgba(0,0,0,0.35)" }}
+              >
+                <MessageCircle size={16} style={{ color: ctaTextColor }} /> {t("send_reservation_whatsapp")}
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  setReservationModalOpen(false);
+                  setReservationCar(null);
+                  resetReservationModalState();
+                }}
+                className="w-full py-2.5 text-sm font-semibold rounded-xl border"
+                style={{ borderColor: formBorder, color: textColor }}
+              >
+                {t("close")}
+              </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 };
@@ -1512,7 +2431,8 @@ const CitiesSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
   const ts = getThemeStyles(theme);
   const lp = theme.landing_page_theme;
   const enabled = cities.filter(c => c.enabled);
-  const bgColor = ts.isDark ? ts.heroBg : (lp === "eco" ? "#e8f5e9" : ts.sectionAlt);
+  const baseBackground = `hsl(${theme.background_color})`;
+  const bgColor = ts.isDark ? ts.heroBg : shiftColor(baseBackground, lp === "eco" ? -0.04 : -0.015);
   const textColor = ts.isDark ? "#fff" : ts.heroText;
   const mutedColor = ts.heroMuted;
   const isFlat = theme.flat_design;
@@ -1520,7 +2440,7 @@ const CitiesSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
   // ── SPORTY: Horizontal full-bleed strip ──
   if (lp === "sporty") {
     return (
-      <section id="cities" className="py-16 px-5" style={{ background: "#0a0a0a", fontFamily: theme.font_family }}>
+      <section id="cities" className="py-16 px-5" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
         <div className="max-w-7xl mx-auto">
           <h2 className="text-3xl font-bold text-white mb-8" style={{ fontFamily: theme.heading_font }}>{lt(config.title)}</h2>
           <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-5 px-5" style={{ scrollbarWidth: "none" }}>
@@ -1528,7 +2448,7 @@ const CitiesSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
               <div key={city.id} className="shrink-0 w-72 h-48 relative rounded-xl overflow-hidden snap-start group animate-fade-in"
                 style={{ animationDelay: `${i * 0.08}s` }}>
                 {city.image ? <img src={city.image} alt={lt(city.name)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                  : <div className="w-full h-full" style={{ background: "#1a1a1a" }} />}
+                  : <div className="w-full h-full" style={{ background: ts.cardBg }} />}
                 <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-transparent" />
                 <div className="absolute bottom-4 left-4">
                   <h3 className="font-bold text-white text-lg" style={{ fontFamily: theme.heading_font }}>{lt(city.name)}</h3>
@@ -1600,7 +2520,7 @@ const CitiesSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
   // ── ARCTIC: Horizontal scroll with rounded pill cards ──
   if (lp === "arctic") {
     return (
-      <section id="cities" className="py-16 px-5" style={{ background: "#fff", fontFamily: theme.font_family }}>
+      <section id="cities" className="py-16 px-5" style={{ background: bgColor, fontFamily: theme.font_family }}>
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10 animate-fade-in">
             <h2 className="text-3xl font-bold" style={{ fontFamily: theme.heading_font, color: textColor }}>{lt(config.title)}</h2>
@@ -1609,7 +2529,7 @@ const CitiesSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
           <div className="flex gap-4 justify-center flex-wrap">
             {enabled.map((city, i) => (
               <div key={city.id} className="flex items-center gap-3 px-4 py-3 rounded-full border transition-all hover:-translate-y-0.5 animate-fade-in"
-                style={{ animationDelay: `${i * 0.08}s`, borderColor: "hsl(210 40% 92%)", background: "#f8fbff" }}>
+                style={{ animationDelay: `${i * 0.08}s`, borderColor: "hsl(210 40% 92%)", background: ts.cardBg }}>
                 <div className="w-10 h-10 rounded-full overflow-hidden shrink-0">
                   {city.image ? <img src={city.image} alt={lt(city.name)} className="w-full h-full object-cover" />
                     : <div className="w-full h-full" style={{ background: `hsl(${theme.primary_color} / 0.1)` }} />}
@@ -1701,7 +2621,8 @@ const TestimonialsSection = ({ config, theme }: { config: ExtendedSectionConfig;
   const ts = getThemeStyles(theme);
   const lp = theme.landing_page_theme;
   const isFlat = theme.flat_design;
-  const bgColor = ts.isDark ? ts.sectionAlt : (lp === "eco" ? "#f0f7f4" : lp === "classic" ? "#f5f0e6" : ts.sectionAlt);
+  const baseBackground = `hsl(${theme.background_color})`;
+  const bgColor = ts.isDark ? ts.sectionAlt : shiftColor(baseBackground, lp === "eco" ? -0.04 : lp === "classic" ? -0.03 : -0.015);
   const textColor = ts.isDark ? "#fff" : ts.heroText;
   const mutedColor = ts.heroMuted;
   const cardBg = ts.isDark ? ts.cardBg : "#fff";
@@ -1721,7 +2642,7 @@ const TestimonialsSection = ({ config, theme }: { config: ExtendedSectionConfig;
     const featured = testimonials[0];
     const rest = testimonials.slice(1);
     return (
-      <section id="testimonials" className="py-20 px-5" style={{ background: "#0a0a0a", fontFamily: theme.font_family }}>
+      <section id="testimonials" className="py-20 px-5" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl font-bold text-white mb-10" style={{ fontFamily: theme.heading_font }}>{lt(config.title)}</h2>
           {featured && (
@@ -1869,7 +2790,7 @@ const TestimonialsSection = ({ config, theme }: { config: ExtendedSectionConfig;
           <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory -mx-5 px-5" style={{ scrollbarWidth: "none" }}>
             {testimonials.map((t, i) => (
               <div key={t.id} className="shrink-0 w-80 rounded-2xl p-6 border snap-center animate-fade-in"
-                style={{ animationDelay: `${i * 0.1}s`, background: "#fff", borderColor: "hsl(210 40% 94%)" }}>
+                style={{ animationDelay: `${i * 0.1}s`, background: cardBg, borderColor: "hsl(210 40% 94%)" }}>
                 {renderStars(t.rating)}
                 <p className="text-sm leading-relaxed mt-3 mb-4" style={{ color: mutedColor }}>{lt(t.review)}</p>
                 <div className="flex items-center gap-3 pt-3 border-t" style={{ borderColor: "hsl(210 40% 94%)" }}>
@@ -1953,7 +2874,7 @@ const AboutSection = ({ config, theme }: { config: ExtendedSectionConfig; theme:
   let contentText = config.content;
   try { const p = JSON.parse(config.content); contentText = p[lang] || p.fr || config.content; } catch {}
 
-  const bgColor = ts.isDark ? ts.heroBg : "#fff";
+  const bgColor = ts.isDark ? ts.heroBg : `hsl(${theme.background_color})`;
   const textColor = ts.isDark ? "#fff" : ts.heroText;
   const mutedColor = ts.heroMuted;
 
@@ -1981,7 +2902,8 @@ const FAQSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: E
   let faqs: { q: any; a: any }[] = [];
   try { faqs = JSON.parse(config.content); } catch {}
 
-  const bgColor = ts.isDark ? ts.sectionAlt : (lp === "eco" ? "#e8f5e9" : lp === "classic" ? ts.sectionAlt : lp === "sunset" ? ts.sectionAlt : lp === "desert" ? ts.sectionAlt : "#fff");
+  const baseBackground = `hsl(${theme.background_color})`;
+  const bgColor = ts.isDark ? ts.sectionAlt : shiftColor(baseBackground, lp === "eco" ? -0.04 : lp === "classic" ? -0.03 : -0.015);
   const textColor = ts.isDark ? "#fff" : ts.heroText;
   const mutedColor = ts.heroMuted;
 
@@ -1991,7 +2913,7 @@ const FAQSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: E
   // ── SPORTY: Numbered FAQ with bold styling ──
   if (lp === "sporty") {
     return (
-      <section id="faq" className="py-20 px-5" style={{ background: "#0a0a0a", fontFamily: theme.font_family }}>
+      <section id="faq" className="py-20 px-5" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl font-bold text-white mb-10" style={{ fontFamily: theme.heading_font }}>{lt(config.title)}</h2>
           <div className="space-y-0 divide-y divide-white/5">
@@ -2052,7 +2974,7 @@ const FAQSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: E
               <Accordion type="single" collapsible className="space-y-2">
                 {faqs.map((faq, i) => (
                   <AccordionItem key={i} value={`faq-${i}`} className="rounded-xl px-5 border-none animate-fade-in"
-                    style={{ animationDelay: `${i * 0.05}s`, background: "#fff" }}>
+                    style={{ animationDelay: `${i * 0.05}s`, background: ts.cardBg }}>
                     <AccordionTrigger className="text-sm font-medium hover:no-underline py-4" style={{ color: textColor }}>{getQ(faq)}</AccordionTrigger>
                     <AccordionContent className="text-sm pb-4" style={{ color: mutedColor }}>{getA(faq)}</AccordionContent>
                   </AccordionItem>
@@ -2077,7 +2999,7 @@ const FAQSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: E
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {faqs.map((faq, i) => (
               <div key={i} className="rounded-2xl p-6 border animate-fade-in"
-                style={{ animationDelay: `${i * 0.08}s`, background: "#fff", borderColor: "hsl(20 20% 92%)", boxShadow: isFlat ? "none" : "0 4px 15px -5px rgba(0,0,0,0.05)" }}>
+                style={{ animationDelay: `${i * 0.08}s`, background: ts.cardBg, borderColor: "hsl(20 20% 92%)", boxShadow: isFlat ? "none" : "0 4px 15px -5px rgba(0,0,0,0.05)" }}>
                 <h3 className="font-bold text-sm mb-3 flex items-start gap-2" style={{ color: textColor }}>
                   <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5" style={{ background: `hsl(${theme.primary_color} / 0.1)`, color: ts.primaryHSL }}>{i + 1}</span>
                   {getQ(faq)}
@@ -2094,7 +3016,7 @@ const FAQSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: E
   // ── ARCTIC: Clean minimal with subtle dividers ──
   if (lp === "arctic") {
     return (
-      <section id="faq" className="py-16 px-5" style={{ background: "#fff", fontFamily: theme.font_family }}>
+      <section id="faq" className="py-16 px-5" style={{ background: bgColor, fontFamily: theme.font_family }}>
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-10 animate-fade-in">
             <h2 className="text-3xl font-bold" style={{ fontFamily: theme.heading_font, color: textColor }}>{lt(config.title)}</h2>
@@ -2127,7 +3049,7 @@ const FAQSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: E
           <Accordion type="single" collapsible className="space-y-3">
             {faqs.map((faq, i) => (
               <AccordionItem key={i} value={`faq-${i}`} className="rounded-2xl px-6 border-none animate-fade-in"
-                style={{ animationDelay: `${i * 0.05}s`, background: "#fff", boxShadow: isFlat ? "none" : "0 2px 10px -3px rgba(0,0,0,0.06)" }}>
+                style={{ animationDelay: `${i * 0.05}s`, background: ts.cardBg, boxShadow: isFlat ? "none" : "0 2px 10px -3px rgba(0,0,0,0.06)" }}>
                 <AccordionTrigger className="text-sm font-medium hover:no-underline py-5" style={{ color: textColor }}>{getQ(faq)}</AccordionTrigger>
                 <AccordionContent className="text-sm pb-5" style={{ color: mutedColor }}>{getA(faq)}</AccordionContent>
               </AccordionItem>
@@ -2180,7 +3102,7 @@ const CTASection = ({ config, theme }: { config: ExtendedSectionConfig; theme: E
   // ── SPORTY: Full-bleed with diagonal ──
   if (lp === "sporty") {
     return (
-      <section className="relative py-24 px-5 overflow-hidden" style={{ background: "#0a0a0a", fontFamily: theme.font_family }}>
+      <section className="relative py-24 px-5 overflow-hidden" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
         <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, hsl(${theme.primary_color} / 0.15), transparent 60%)` }} />
         <div className="relative z-10 max-w-3xl mx-auto text-center animate-fade-in">
           <h2 className="text-4xl sm:text-5xl font-black text-white mb-4" style={{ fontFamily: theme.heading_font }}>{lt(config.title)}</h2>
@@ -2259,7 +3181,7 @@ const CTASection = ({ config, theme }: { config: ExtendedSectionConfig; theme: E
     return (
       <section className="py-16 px-5" style={{ background: ts.sectionAlt, fontFamily: theme.font_family }}>
         <div className="max-w-lg mx-auto rounded-3xl p-10 text-center border animate-fade-in"
-          style={{ background: "#fff", borderColor: "hsl(210 40% 94%)", boxShadow: "0 20px 60px -15px rgba(0,0,0,0.06)" }}>
+          style={{ background: ts.cardBg, borderColor: "hsl(210 40% 94%)", boxShadow: "0 20px 60px -15px rgba(0,0,0,0.06)" }}>
           <h2 className="text-2xl font-bold mb-3" style={{ fontFamily: theme.heading_font, color: ts.heroText }}>{lt(config.title)}</h2>
           <p className="text-sm mb-8 whitespace-pre-line" style={{ color: ts.heroMuted }}>{lt(config.subtitle)}</p>
           <a href={`https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}`} target="_blank" rel="noopener noreferrer"
@@ -2335,27 +3257,47 @@ const FooterSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
   const menuNav = navItems.filter(n => n.enabled && n.show_in_menu);
   const ts = getThemeStyles(theme);
   const lp = theme.landing_page_theme;
+  const footerText = ensureReadableAccent(`hsl(${theme.footer_text_color || theme.text_color})`, ts.footerBg, 3) || `hsl(${theme.footer_text_color || theme.text_color})`;
+  const footerMuted = withAlpha(footerText, 0.72);
+  const footerSubtle = withAlpha(footerText, 0.52);
+  const footerFaint = withAlpha(footerText, 0.3);
+  const footerBorder = withAlpha(footerText, 0.14);
+  const renderFooterLogo = (imageClassName: string, textClassName: string) => {
+    if (siteConfig.logo_display_mode === "image" && siteConfig.logo_image) {
+      return (
+        <img
+          src={siteConfig.logo_image}
+          alt={siteConfig.logo_text}
+          className={`${imageClassName} w-auto object-contain`}
+        />
+      );
+    }
+    return (
+      <span className={textClassName} style={{ fontFamily: theme.heading_font, color: footerText }}>
+        <span style={{ color: ts.primaryHSL }}>{siteConfig.logo_text.charAt(0)}</span>
+        {siteConfig.logo_text.slice(1)}
+      </span>
+    );
+  };
 
   // ── SPORTY: Minimal dark footer ──
   if (lp === "sporty") {
     return (
-      <footer id="footer" className="py-8 px-5 text-white" style={{ background: "#050505", fontFamily: theme.font_family, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <footer id="footer" className="py-8 px-5" style={{ background: ts.footerBg, color: footerText, fontFamily: theme.font_family, borderTop: `1px solid ${footerBorder}` }}>
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <span className="text-lg font-bold" style={{ fontFamily: theme.heading_font }}>
-            <span style={{ color: ts.primaryHSL }}>{siteConfig.logo_text.charAt(0)}</span>{siteConfig.logo_text.slice(1)}
-          </span>
+          {renderFooterLogo("h-16 sm:h-20 max-w-[340px]", "text-lg sm:text-xl font-bold")}
           <div className="flex gap-4">
-            {menuNav.map(n => <a key={n.id} href={n.href} className="text-xs text-white/40 hover:text-white transition-colors">{lt(n.label)}</a>)}
+            {menuNav.map(n => <a key={n.id} href={n.href} className="text-xs transition-colors" style={{ color: footerSubtle }}>{lt(n.label)}</a>)}
           </div>
           <div className="flex gap-3">
             {contact.social_links.map((s, i) => (
-              <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="text-white/30 hover:text-white transition-colors">
+              <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="transition-colors" style={{ color: footerSubtle }}>
                 <DynIcon name={s.icon} size={16} />
               </a>
             ))}
           </div>
         </div>
-        <p className="text-center text-[10px] text-white/20 mt-6">{siteConfig.copyright}</p>
+        <p className="text-center text-[10px] mt-6" style={{ color: footerFaint }}>{siteConfig.copyright}</p>
       </footer>
     );
   }
@@ -2363,17 +3305,15 @@ const FooterSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
   // ── SUNSET: Editorial footer ──
   if (lp === "sunset") {
     return (
-      <footer id="footer" className="py-16 px-5" style={{ background: ts.footerBg, fontFamily: theme.font_family }}>
+      <footer id="footer" className="py-16 px-5" style={{ background: ts.footerBg, color: footerText, fontFamily: theme.font_family }}>
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-10">
             <div>
-              <h3 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: theme.heading_font }}>
-                <span style={{ color: ts.primaryHSL }}>{siteConfig.logo_text.charAt(0)}</span>{siteConfig.logo_text.slice(1)}
-              </h3>
-              <p className="text-sm text-white/40 max-w-sm">{lt(siteConfig.logo_tagline)}</p>
+              <div className="mb-3">{renderFooterLogo("h-16 sm:h-20 max-w-[360px]", "text-2xl sm:text-3xl font-bold")}</div>
+              <p className="text-sm max-w-sm" style={{ color: footerSubtle }}>{lt(siteConfig.logo_tagline)}</p>
               <div className="flex gap-3 mt-6">
                 {contact.social_links.map((s, i) => (
-                  <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-colors">
+                  <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full flex items-center justify-center transition-colors" style={{ background: withAlpha(footerText, 0.08), color: footerSubtle }}>
                     <DynIcon name={s.icon} size={16} />
                   </a>
                 ))}
@@ -2381,22 +3321,22 @@ const FooterSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
             </div>
             <div className="grid grid-cols-2 gap-8">
               <div>
-                <h4 className="text-xs uppercase tracking-wider text-white/30 mb-4">{t("quick_links")}</h4>
+                <h4 className="text-xs uppercase tracking-wider mb-4" style={{ color: footerFaint }}>{t("quick_links")}</h4>
                 <div className="space-y-2">
-                  {menuNav.map(n => <a key={n.id} href={n.href} className="block text-sm text-white/50 hover:text-white transition-colors">{lt(n.label)}</a>)}
+                  {menuNav.map(n => <a key={n.id} href={n.href} className="block text-sm transition-colors" style={{ color: footerMuted }}>{lt(n.label)}</a>)}
                 </div>
               </div>
               <div>
-                <h4 className="text-xs uppercase tracking-wider text-white/30 mb-4">{t("contact_us")}</h4>
-                <div className="space-y-2 text-sm text-white/50">
+                <h4 className="text-xs uppercase tracking-wider mb-4" style={{ color: footerFaint }}>{t("contact_us")}</h4>
+                <div className="space-y-2 text-sm" style={{ color: footerMuted }}>
                   <p className="flex items-center gap-2"><Phone size={14} /> {contact.phone}</p>
                   <p className="flex items-center gap-2"><Mail size={14} /> {contact.email}</p>
                 </div>
               </div>
             </div>
           </div>
-          <div className="border-t border-white/5 pt-6">
-            <p className="text-xs text-white/20 text-center">{siteConfig.copyright} · {t("all_rights_reserved")}</p>
+          <div className="border-t pt-6" style={{ borderColor: footerBorder }}>
+            <p className="text-xs text-center" style={{ color: footerFaint }}>{siteConfig.copyright} · {t("all_rights_reserved")}</p>
           </div>
         </div>
       </footer>
@@ -2406,23 +3346,21 @@ const FooterSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
   // ── ARCTIC: Clean minimal footer ──
   if (lp === "arctic") {
     return (
-      <footer id="footer" className="py-12 px-5" style={{ background: ts.footerBg, fontFamily: theme.font_family }}>
+      <footer id="footer" className="py-12 px-5" style={{ background: ts.footerBg, color: footerText, fontFamily: theme.font_family }}>
         <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-lg font-bold text-white mb-2" style={{ fontFamily: theme.heading_font }}>
-            <span style={{ color: ts.primaryHSL }}>{siteConfig.logo_text.charAt(0)}</span>{siteConfig.logo_text.slice(1)}
-          </h3>
-          <p className="text-xs text-white/30 mb-6">{lt(siteConfig.logo_tagline)}</p>
+          <div className="mb-2 flex justify-center">{renderFooterLogo("h-16 sm:h-20 max-w-[340px]", "text-lg sm:text-xl font-bold")}</div>
+          <p className="text-xs mb-6" style={{ color: footerFaint }}>{lt(siteConfig.logo_tagline)}</p>
           <div className="flex gap-4 justify-center flex-wrap mb-6">
-            {menuNav.map(n => <a key={n.id} href={n.href} className="text-xs text-white/40 hover:text-white transition-colors">{lt(n.label)}</a>)}
+            {menuNav.map(n => <a key={n.id} href={n.href} className="text-xs transition-colors" style={{ color: footerSubtle }}>{lt(n.label)}</a>)}
           </div>
           <div className="flex gap-3 justify-center mb-6">
             {contact.social_links.map((s, i) => (
-              <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="text-white/30 hover:text-white transition-colors">
+              <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="transition-colors" style={{ color: footerSubtle }}>
                 <DynIcon name={s.icon} size={16} />
               </a>
             ))}
           </div>
-          <p className="text-[10px] text-white/20">{siteConfig.copyright} · {t("all_rights_reserved")}</p>
+          <p className="text-[10px]" style={{ color: footerFaint }}>{siteConfig.copyright} · {t("all_rights_reserved")}</p>
         </div>
       </footer>
     );
@@ -2430,46 +3368,44 @@ const FooterSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
 
   // ── Default (elegant, eco, classic, neon, desert) ──
   return (
-    <footer id="footer" className="py-12 px-5 text-white" style={{ background: ts.footerBg, fontFamily: theme.font_family }}>
+    <footer id="footer" className="py-12 px-5" style={{ background: ts.footerBg, color: footerText, fontFamily: theme.font_family }}>
       <div className="max-w-5xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-1">
-            <h3 className="text-lg font-bold mb-2" style={{ fontFamily: theme.heading_font }}>
-              <span style={{ color: ts.primaryHSL }}>{siteConfig.logo_text.charAt(0)}</span>{siteConfig.logo_text.slice(1)}
-            </h3>
-            <p className="text-xs text-slate-400">{lt(siteConfig.logo_tagline)}</p>
+          <div className="mb-2">{renderFooterLogo("h-16 sm:h-20 max-w-[340px]", "text-lg sm:text-xl font-bold")}</div>
+            <p className="text-xs" style={{ color: footerSubtle }}>{lt(siteConfig.logo_tagline)}</p>
             <div className="flex gap-2 mt-4">
               {contact.social_links.map((s, i) => (
-                <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+                <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-full flex items-center justify-center transition-colors" style={{ background: withAlpha(footerText, 0.08), color: footerSubtle }}>
                   <DynIcon name={s.icon} size={16} />
                 </a>
               ))}
             </div>
           </div>
           <div>
-            <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-3">{t("quick_links")}</h4>
+            <h4 className="text-xs uppercase tracking-wider mb-3" style={{ color: footerSubtle }}>{t("quick_links")}</h4>
             <div className="space-y-2">
-              {menuNav.map(n => <a key={n.id} href={n.href} className="block text-sm text-slate-400 hover:text-white transition-colors">{lt(n.label)}</a>)}
+              {menuNav.map(n => <a key={n.id} href={n.href} className="block text-sm transition-colors" style={{ color: footerSubtle }}>{lt(n.label)}</a>)}
             </div>
           </div>
           <div>
-            <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-3">{t("contact_us")}</h4>
-            <div className="space-y-2 text-sm text-slate-400">
+            <h4 className="text-xs uppercase tracking-wider mb-3" style={{ color: footerSubtle }}>{t("contact_us")}</h4>
+            <div className="space-y-2 text-sm" style={{ color: footerSubtle }}>
               <p className="flex items-center gap-2"><Phone size={14} /> {contact.phone}</p>
               <p className="flex items-center gap-2"><Mail size={14} /> {contact.email}</p>
               <p className="flex items-center gap-2"><MapPin size={14} /> {lt(contact.address)}</p>
             </div>
           </div>
           <div>
-            <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-3">WhatsApp</h4>
+            <h4 className="text-xs uppercase tracking-wider mb-3" style={{ color: footerSubtle }}>WhatsApp</h4>
             <a href={`https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}`} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white rounded-xl btn-animated" style={{ background: ts.primaryHSL }}>
               <MessageCircle size={16} /> {t("whatsapp_cta")}
             </a>
           </div>
         </div>
-        <div className="border-t border-white/10 mt-8 pt-6">
-          <p className="text-xs text-slate-500 text-center">{siteConfig.copyright} · {t("all_rights_reserved")}</p>
+        <div className="border-t mt-8 pt-6" style={{ borderColor: footerBorder }}>
+          <p className="text-xs text-center" style={{ color: footerFaint }}>{siteConfig.copyright} · {t("all_rights_reserved")}</p>
         </div>
       </div>
     </footer>
@@ -2662,8 +3598,41 @@ const sectionMap: Record<string, React.FC<any>> = {
 };
 
 const DynamicFrontend = () => {
+  const pathname = usePathname();
   const { sections, theme, cars, seo, stateReady } = useAdmin();
+  const previewTheme = useMemo(() => {
+    if (!pathname.startsWith("/preview/")) return null;
+
+    const slug = pathname.split("/").filter(Boolean)[1] || "";
+    const presetKeys = Object.keys(landingPageThemePresets) as LandingPageTheme[];
+
+    const fromIndex = slug.match(/^theme-(\d+)$/i);
+    let presetKey: LandingPageTheme | undefined;
+
+    if (fromIndex) {
+      const index = Number(fromIndex[1]) - 1;
+      if (Number.isFinite(index) && index >= 0 && index < presetKeys.length) {
+        presetKey = presetKeys[index];
+      }
+    } else if ((presetKeys as string[]).includes(slug)) {
+      presetKey = slug as LandingPageTheme;
+    }
+
+    if (!presetKey) return null;
+    const preset = landingPageThemePresets[presetKey];
+    return {
+      ...initialExtendedTheme,
+      ...preset.overrides,
+      landing_page_theme: presetKey,
+      footer_background_color: preset.overrides.footer_background_color ?? preset.overrides.secondary_color ?? initialExtendedTheme.footer_background_color,
+      footer_text_color: preset.overrides.footer_text_color ?? preset.overrides.text_color ?? initialExtendedTheme.footer_text_color,
+    } as ExtendedThemeConfig;
+  }, [pathname]);
+  const effectiveTheme = previewTheme ?? theme;
   const { lt, lang, isRTL } = useLanguage();
+  const ts = getThemeStyles(effectiveTheme);
+  const rootBg = `hsl(${effectiveTheme.background_color})`;
+  const rootText = ensureReadableAccent(`hsl(${effectiveTheme.text_color})`, rootBg, 4.5) || ts.heroText;
   const enabled = [...sections].filter(s => s.enabled).sort((a, b) => a.order - b.order);
 
   useEffect(() => {
@@ -2673,17 +3642,42 @@ const DynamicFrontend = () => {
     if (metaDesc) metaDesc.setAttribute("content", lt(seo.description));
   }, [seo, lang, lt, stateReady]);
 
+  useEffect(() => {
+    if (!stateReady) return;
+    const htmlEl = document.documentElement;
+    const bodyEl = document.body;
+    const prevHtmlBg = htmlEl.style.backgroundColor;
+    const prevBodyBg = bodyEl.style.backgroundColor;
+    const prevBodyColor = bodyEl.style.color;
+    const prevThemeBgVar = htmlEl.style.getPropertyValue("--background");
+    const prevThemeFgVar = htmlEl.style.getPropertyValue("--foreground");
+
+    htmlEl.style.setProperty("--background", effectiveTheme.background_color);
+    htmlEl.style.setProperty("--foreground", effectiveTheme.text_color);
+    htmlEl.style.backgroundColor = rootBg;
+    bodyEl.style.backgroundColor = rootBg;
+    bodyEl.style.color = rootText;
+
+    return () => {
+      htmlEl.style.setProperty("--background", prevThemeBgVar);
+      htmlEl.style.setProperty("--foreground", prevThemeFgVar);
+      htmlEl.style.backgroundColor = prevHtmlBg;
+      bodyEl.style.backgroundColor = prevBodyBg;
+      bodyEl.style.color = prevBodyColor;
+    };
+  }, [effectiveTheme.background_color, effectiveTheme.text_color, rootBg, rootText, stateReady]);
+
   if (!stateReady) return null;
 
   return (
-    <div style={{ fontFamily: theme.font_family }} dir={isRTL ? "rtl" : "ltr"} className="bg-white">
-      <FrontendHeader theme={theme} />
+    <div style={{ minHeight: "100vh", fontFamily: effectiveTheme.font_family, background: rootBg, color: rootText }} dir={isRTL ? "rtl" : "ltr"}>
+      <FrontendHeader theme={effectiveTheme} />
       {enabled.map(section => {
         const Component = sectionMap[section.type];
         if (!Component) return null;
-        return <Component key={section.id} config={section} theme={theme} cars={cars} />;
+        return <Component key={section.id} config={section} theme={effectiveTheme} cars={cars} />;
       })}
-      <WhatsAppButton theme={theme} />
+      <WhatsAppButton theme={effectiveTheme} />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { initialCars, initialBookings } from "../src/data/mock-database";
+import { initialCars } from "../src/data/mock-database";
 import {
   initialExtendedTheme,
   initialExtendedSections,
@@ -63,21 +63,6 @@ async function main() {
     });
   }
 
-  for (const booking of initialBookings) {
-    await prisma.booking.create({
-      data: {
-        id: booking.booking_id,
-        customerName: booking.customer_name,
-        phone: booking.phone,
-        email: booking.email,
-        pickupDate: new Date(booking.pickup_date),
-        returnDate: new Date(booking.return_date),
-        carId: booking.car_id,
-        status: booking.status,
-      },
-    });
-  }
-
   await prisma.themeConfig.upsert({
     where: { id: "default" },
     update: {
@@ -86,6 +71,8 @@ async function main() {
       accentColor: initialExtendedTheme.accent_color,
       backgroundColor: initialExtendedTheme.background_color,
       textColor: initialExtendedTheme.text_color,
+      footerBackgroundColor: initialExtendedTheme.footer_background_color,
+      footerTextColor: initialExtendedTheme.footer_text_color,
       fontFamily: initialExtendedTheme.font_family,
       headingFont: initialExtendedTheme.heading_font,
       borderRadius: initialExtendedTheme.border_radius,
@@ -115,6 +102,8 @@ async function main() {
       accentColor: initialExtendedTheme.accent_color,
       backgroundColor: initialExtendedTheme.background_color,
       textColor: initialExtendedTheme.text_color,
+      footerBackgroundColor: initialExtendedTheme.footer_background_color,
+      footerTextColor: initialExtendedTheme.footer_text_color,
       fontFamily: initialExtendedTheme.font_family,
       headingFont: initialExtendedTheme.heading_font,
       borderRadius: initialExtendedTheme.border_radius,

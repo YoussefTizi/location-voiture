@@ -1,3 +1,5 @@
+import { DEFAULT_SITE_NAME } from "@/data/site-config";
+
 export interface Car {
   id: string;
   name: string;
@@ -21,6 +23,9 @@ export interface Booking {
   return_date: string;
   car_id: string;
   status: "pending" | "confirmed" | "cancelled";
+  price_per_day_snapshot: number;
+  total_amount_snapshot: number;
+  currency_code: string;
 }
 
 export interface SectionConfig {
@@ -137,11 +142,11 @@ export const initialCars: Car[] = [
 ];
 
 export const initialBookings: Booking[] = [
-  { booking_id: "BK-001", customer_name: "Youssef Amrani", phone: "+212 6 00 11 22 33", email: "youssef@email.com", pickup_date: "2026-03-01", return_date: "2026-03-05", car_id: "car-1", status: "confirmed" },
-  { booking_id: "BK-002", customer_name: "Sofia Martinez", phone: "+212 6 00 44 55 66", email: "sofia@email.com", pickup_date: "2026-03-03", return_date: "2026-03-10", car_id: "car-2", status: "pending" },
-  { booking_id: "BK-003", customer_name: "Ahmed Benali", phone: "+212 6 00 77 88 99", email: "ahmed@email.com", pickup_date: "2026-02-25", return_date: "2026-03-02", car_id: "car-3", status: "confirmed" },
-  { booking_id: "BK-004", customer_name: "Marie Dubois", phone: "+212 6 00 12 34 56", email: "marie@email.com", pickup_date: "2026-03-08", return_date: "2026-03-12", car_id: "car-5", status: "pending" },
-  { booking_id: "BK-005", customer_name: "Karim El Fassi", phone: "+212 6 00 65 43 21", email: "karim@email.com", pickup_date: "2026-02-20", return_date: "2026-02-23", car_id: "car-4", status: "cancelled" },
+  { booking_id: "BK-001", customer_name: "Youssef Amrani", phone: "+212 6 00 11 22 33", email: "youssef@email.com", pickup_date: "2026-03-01", return_date: "2026-03-05", car_id: "car-1", status: "confirmed", price_per_day_snapshot: 450, total_amount_snapshot: 1800, currency_code: "MAD" },
+  { booking_id: "BK-002", customer_name: "Sofia Martinez", phone: "+212 6 00 44 55 66", email: "sofia@email.com", pickup_date: "2026-03-03", return_date: "2026-03-10", car_id: "car-2", status: "pending", price_per_day_snapshot: 650, total_amount_snapshot: 4550, currency_code: "MAD" },
+  { booking_id: "BK-003", customer_name: "Ahmed Benali", phone: "+212 6 00 77 88 99", email: "ahmed@email.com", pickup_date: "2026-02-25", return_date: "2026-03-02", car_id: "car-3", status: "confirmed", price_per_day_snapshot: 380, total_amount_snapshot: 1900, currency_code: "MAD" },
+  { booking_id: "BK-004", customer_name: "Marie Dubois", phone: "+212 6 00 12 34 56", email: "marie@email.com", pickup_date: "2026-03-08", return_date: "2026-03-12", car_id: "car-5", status: "pending", price_per_day_snapshot: 1200, total_amount_snapshot: 4800, currency_code: "MAD" },
+  { booking_id: "BK-005", customer_name: "Karim El Fassi", phone: "+212 6 00 65 43 21", email: "karim@email.com", pickup_date: "2026-02-20", return_date: "2026-02-23", car_id: "car-4", status: "cancelled", price_per_day_snapshot: 500, total_amount_snapshot: 1500, currency_code: "MAD" },
 ];
 
 export const initialSections: SectionConfig[] = [
@@ -150,7 +155,7 @@ export const initialSections: SectionConfig[] = [
   { id: "sec-about", type: "about", enabled: true, title: "Why Choose Us", subtitle: "Trusted by thousands", content: "", background_style: "gradient", layout_variant: "split", order: 2 },
   { id: "sec-faq", type: "faq", enabled: true, title: "Common Questions", subtitle: "Everything you need to know", content: "[]", background_style: "light", layout_variant: "default", order: 3 },
   { id: "sec-cta", type: "cta", enabled: true, title: "Ready?", subtitle: "Book your car today", content: "", background_style: "accent", layout_variant: "centered", order: 4 },
-  { id: "sec-footer", type: "footer", enabled: true, title: "RentFlow", subtitle: "© 2026", content: "", background_style: "dark", layout_variant: "default", order: 5 },
+  { id: "sec-footer", type: "footer", enabled: true, title: DEFAULT_SITE_NAME, subtitle: "© 2026", content: "", background_style: "dark", layout_variant: "default", order: 5 },
 ];
 
 export const initialTheme: ThemeConfig = {
@@ -162,7 +167,7 @@ export const initialTheme: ThemeConfig = {
   button_style: "rounded",
   card_style: "elevated",
   spacing_density: "normal",
-  site_name: "RentFlow",
+  site_name: DEFAULT_SITE_NAME,
 };
 
 export const initialStats: DashboardStats = {

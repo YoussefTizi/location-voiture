@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminState } from "@/lib/server/admin-state";
+import { ensureAdminStateInitialized } from "@/lib/server/ensure-admin-state";
 
 export async function GET() {
   try {
@@ -19,6 +20,8 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
 
     await prisma.$transaction(async (tx) => {
+      await ensureAdminStateInitialized(tx);
+
       if (body.theme) {
         const t = body.theme;
         await tx.themeConfig.update({
@@ -29,6 +32,8 @@ export async function PUT(req: NextRequest) {
             accentColor: t.accent_color,
             backgroundColor: t.background_color,
             textColor: t.text_color,
+            footerBackgroundColor: t.footer_background_color,
+            footerTextColor: t.footer_text_color,
             fontFamily: t.font_family,
             headingFont: t.heading_font,
             borderRadius: t.border_radius,

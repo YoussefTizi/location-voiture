@@ -1,6 +1,7 @@
 /* ─── Multilingual & Site Configuration ─── */
 
 export type Language = "fr" | "en" | "ar";
+export const DEFAULT_SITE_NAME = "DriveStyle Studio";
 
 export type LocalizedText = { fr: string; en: string; ar: string };
 
@@ -135,6 +136,8 @@ export interface ExtendedThemeConfig {
   accent_color: string;
   background_color: string;
   text_color: string;
+  footer_background_color: string;
+  footer_text_color: string;
   font_family: string;
   heading_font: string;
   border_radius: string;
@@ -245,6 +248,19 @@ export const uiTranslations: Record<string, LocalizedText> = {
   chat_whatsapp: { fr: "Discuter sur WhatsApp", en: "Chat on WhatsApp", ar: "تحدث على واتساب" },
   open_hours: { fr: "Ouvert 7j/7 - 24h/24", en: "Open 24/7", ar: "مفتوح 24/7" },
   call_directly: { fr: "Ou appelez-nous directement", en: "Or call us directly", ar: "أو اتصل بنا مباشرة" },
+  field_required: { fr: "Ce champ est requis", en: "This field is required", ar: "هذا الحقل مطلوب" },
+  invalid_email: { fr: "Email invalide", en: "Invalid email address", ar: "بريد إلكتروني غير صالح" },
+  return_after_pickup: { fr: "La date de retour doit être après la date de prise en charge", en: "Return date must be after pick-up date", ar: "يجب أن يكون تاريخ الإرجاع بعد تاريخ الاستلام" },
+  reservation_confirmed_title: { fr: "Réservation confirmée", en: "Reservation Confirmed", ar: "تم تأكيد الحجز" },
+  reservation_confirmed_subtitle: { fr: "Merci. Vérifiez les détails puis envoyez la confirmation sur WhatsApp.", en: "Thank you. Review the details and send confirmation on WhatsApp.", ar: "شكرًا لك. راجع التفاصيل ثم أرسل التأكيد عبر واتساب." },
+  send_reservation_whatsapp: { fr: "Envoyer la confirmation sur WhatsApp", en: "Send confirmation on WhatsApp", ar: "إرسال التأكيد عبر واتساب" },
+  reservation_whatsapp_intro: { fr: "Bonjour, je confirme ma demande de réservation.", en: "Hello, I confirm my reservation request.", ar: "مرحبًا، أؤكد طلب الحجز الخاص بي." },
+  close: { fr: "Fermer", en: "Close", ar: "إغلاق" },
+  reservation_reference: { fr: "Référence", en: "Reference", ar: "المرجع" },
+  reservation_form_hint: { fr: "Complétez les informations pour finaliser votre demande.", en: "Complete your details to finalize your request.", ar: "أكمل بياناتك لإتمام طلبك." },
+  saving_reservation: { fr: "Enregistrement en cours...", en: "Saving reservation...", ar: "جارٍ حفظ الحجز..." },
+  booking_save_failed: { fr: "Impossible d'enregistrer la réservation. Réessayez.", en: "Unable to save reservation. Please try again.", ar: "تعذر حفظ الحجز. يرجى المحاولة مرة أخرى." },
+  thank_you: { fr: "Merci", en: "Thank you", ar: "شكرًا" },
 };
 
 /* ─── Initial Data ─── */
@@ -325,21 +341,25 @@ export const initialContact: ContactConfig = {
 };
 
 export const initialSEO: SEOConfig = {
-  title: { fr: "RentFlow — Location de voitures premium au Maroc", en: "RentFlow — Premium Car Rental in Morocco", ar: "RentFlow — تأجير سيارات فاخرة في المغرب" },
+  title: {
+    fr: `${DEFAULT_SITE_NAME} — Location de voitures premium au Maroc`,
+    en: `${DEFAULT_SITE_NAME} — Premium Car Rental in Morocco`,
+    ar: `${DEFAULT_SITE_NAME} — تأجير سيارات فاخرة في المغرب`,
+  },
   description: { fr: "Louez des voitures de luxe au Maroc. Réservation simple et rapide.", en: "Rent luxury cars in Morocco. Simple and fast booking.", ar: "استأجر سيارات فاخرة في المغرب. حجز بسيط وسريع." },
   keywords: "car rental, morocco, luxury, location voiture, maroc",
   og_image: "",
 };
 
 export const initialSiteConfig: SiteConfig = {
-  logo_text: "RentFlow",
+  logo_text: DEFAULT_SITE_NAME,
   logo_image: "",
   logo_display_mode: "text",
   logo_tagline: { fr: "Location premium au Maroc", en: "Premium rental in Morocco", ar: "تأجير فاخر في المغرب" },
   hero_background_image: "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=1920&h=1080&fit=crop",
   hero_side_image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&h=600&fit=crop",
   hero_side_image_mode: "image",
-  copyright: "© 2026 RentFlow",
+  copyright: `© 2026 ${DEFAULT_SITE_NAME}`,
 };
 
 export const initialBookingFormConfig: BookingFormConfig = {
@@ -375,12 +395,17 @@ export const initialEstimationConfig: EstimationConfig = {
   show_date_field: true,
 };
 
-export type CurrencyOption = { code: string; symbol: string; label: string };
+export type CurrencyOption = {
+  code: string;
+  symbol: string;
+  label: string;
+  rate_from_mad: number;
+};
 
 export const currencyOptions: CurrencyOption[] = [
-  { code: "MAD", symbol: "DH", label: "MAD (DH)" },
-  { code: "USD", symbol: "$", label: "USD ($)" },
-  { code: "EUR", symbol: "€", label: "EUR (€)" },
+  { code: "MAD", symbol: "DH", label: "MAD (DH)", rate_from_mad: 1 },
+  { code: "USD", symbol: "$", label: "USD ($)", rate_from_mad: 0.1 },
+  { code: "EUR", symbol: "€", label: "EUR (€)", rate_from_mad: 0.092 },
 ];
 
 export const initialExtendedTheme: ExtendedThemeConfig = {
@@ -389,6 +414,8 @@ export const initialExtendedTheme: ExtendedThemeConfig = {
   accent_color: "220 60% 55%",
   background_color: "0 0% 100%",
   text_color: "220 20% 10%",
+  footer_background_color: "220 15% 25%",
+  footer_text_color: "0 0% 100%",
   font_family: "Figtree",
   heading_font: "Figtree",
   border_radius: "0.75rem",
@@ -399,7 +426,7 @@ export const initialExtendedTheme: ExtendedThemeConfig = {
   spacing_density: "normal",
   dark_mode_enabled: false,
   header_style: "transparent",
-  site_name: "RentFlow",
+  site_name: DEFAULT_SITE_NAME,
   landing_page_theme: "elegant",
   hero_image_position: "right",
   flat_design: false,
@@ -516,7 +543,7 @@ export const initialExtendedSections: ExtendedSectionConfig[] = [
   },
   {
     id: "sec-footer", type: "footer", enabled: true, order: 10,
-    title: { fr: "RentFlow", en: "RentFlow", ar: "RentFlow" },
+    title: { fr: DEFAULT_SITE_NAME, en: DEFAULT_SITE_NAME, ar: DEFAULT_SITE_NAME },
     subtitle: { fr: "", en: "", ar: "" },
     content: "", background_style: "dark", layout_variant: "default",
   },
@@ -537,6 +564,8 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
       primary_color: "142 71% 45%",
       secondary_color: "220 15% 25%",
       accent_color: "220 60% 55%",
+      background_color: "0 0% 100%",
+      text_color: "220 20% 10%",
       font_family: "Figtree",
       heading_font: "Figtree",
       button_style: "rounded",
@@ -551,6 +580,8 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
       primary_color: "0 84% 60%",
       secondary_color: "220 20% 15%",
       accent_color: "35 95% 55%",
+      background_color: "220 20% 7%",
+      text_color: "0 0% 100%",
       font_family: "Outfit",
       heading_font: "Outfit",
       button_style: "sharp",
@@ -565,6 +596,8 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
       primary_color: "160 45% 40%",
       secondary_color: "40 30% 25%",
       accent_color: "45 70% 55%",
+      background_color: "140 25% 96%",
+      text_color: "150 30% 20%",
       font_family: "DM Sans",
       heading_font: "Playfair Display",
       button_style: "pill",
@@ -579,6 +612,8 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
       primary_color: "220 50% 35%",
       secondary_color: "220 30% 15%",
       accent_color: "43 80% 55%",
+      background_color: "40 25% 95%",
+      text_color: "220 35% 16%",
       font_family: "Inter",
       heading_font: "Playfair Display",
       button_style: "rounded",
@@ -593,6 +628,8 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
       primary_color: "280 80% 55%",
       secondary_color: "220 25% 10%",
       accent_color: "190 100% 50%",
+      background_color: "230 30% 8%",
+      text_color: "0 0% 100%",
       font_family: "Space Grotesk",
       heading_font: "Space Grotesk",
       button_style: "sharp",
@@ -607,6 +644,8 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
       primary_color: "15 85% 55%",
       secondary_color: "25 30% 20%",
       accent_color: "35 90% 60%",
+      background_color: "28 70% 96%",
+      text_color: "20 35% 18%",
       font_family: "DM Sans",
       heading_font: "Playfair Display",
       button_style: "pill",
@@ -621,6 +660,8 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
       primary_color: "200 80% 55%",
       secondary_color: "210 40% 90%",
       accent_color: "180 60% 45%",
+      background_color: "205 45% 96%",
+      text_color: "215 45% 20%",
       font_family: "Figtree",
       heading_font: "Figtree",
       button_style: "rounded",
@@ -635,6 +676,8 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
       primary_color: "20 60% 50%",
       secondary_color: "35 25% 20%",
       accent_color: "45 50% 55%",
+      background_color: "35 45% 92%",
+      text_color: "24 30% 20%",
       font_family: "DM Sans",
       heading_font: "Playfair Display",
       button_style: "rounded",
