@@ -150,6 +150,17 @@ model Car {
   @@map("car")
 }
 
+model CarCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@map("car_category")
+}
+
 model CarImage {
   id        String @id @default(uuid())
   carId     String @map("car_id")
@@ -162,17 +173,20 @@ model CarImage {
 }
 
 model Booking {
-  id           String        @id @map("booking_id")
-  customerName String        @map("customer_name")
-  phone        String
-  email        String
-  pickupDate   DateTime      @map("pickup_date")
-  returnDate   DateTime      @map("return_date")
-  carId        String        @map("car_id")
-  status       BookingStatus
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  car          Car           @relation(fields: [carId], references: [id], onDelete: Restrict)
+  id                  String        @id @map("booking_id")
+  customerName        String        @map("customer_name")
+  phone               String
+  email               String
+  pickupDate          DateTime      @map("pickup_date")
+  returnDate          DateTime      @map("return_date")
+  carId               String        @map("car_id")
+  status              BookingStatus
+  pricePerDaySnapshot Float         @map("price_per_day_snapshot")
+  totalAmountSnapshot Float         @map("total_amount_snapshot")
+  currencyCode        String        @map("currency_code")
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  car                 Car           @relation(fields: [carId], references: [id], onDelete: Restrict)
 
   @@index([carId, status])
   @@map("booking")
@@ -185,6 +199,8 @@ model ThemeConfig {
   accentColor           String            @map("accent_color")
   backgroundColor       String            @map("background_color")
   textColor             String            @map("text_color")
+  footerBackgroundColor String            @map("footer_background_color")
+  footerTextColor       String            @map("footer_text_color")
   fontFamily            String            @map("font_family")
   headingFont           String            @map("heading_font")
   borderRadius          String            @map("border_radius")

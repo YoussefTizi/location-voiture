@@ -1,5 +1,5 @@
-import SalesLanding from "@/views/SalesLanding";
+import Index from "@/views/Index";
 
 export default function Page() {
-  return <SalesLanding />;
+  return <Index />;
 }

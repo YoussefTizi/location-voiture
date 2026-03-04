@@ -19,5 +19,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return_date: booking.returnDate.toISOString().slice(0, 10),
     car_id: booking.carId,
     status: booking.status,
+    price_per_day_snapshot: booking.pricePerDaySnapshot,
+    total_amount_snapshot: booking.totalAmountSnapshot,
+    currency_code: booking.currencyCode,
   });
 }

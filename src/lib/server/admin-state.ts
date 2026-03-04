@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Booking, Car, DashboardStats } from "@/data/mock-database";
+import { ensureAdminStateInitialized } from "@/lib/server/ensure-admin-state";
 import type {
   BookingFormConfig,
   City,
@@ -36,6 +37,10 @@ export type AdminStatePayload = {
 const asLocalized = (value: unknown) => value as { fr: string; en: string; ar: string };
 
 export async function getAdminState(): Promise<AdminStatePayload> {
+  await prisma.$transaction(async (tx) => {
+    await ensureAdminStateInitialized(tx);
+  });
+
   const [cars, bookings, theme, sections, siteConfig, navItems, cities, testimonials, features, contact, socialLinks, agencies, seo, estimation, pricingTiers, estimationBadges, bookingForm, customThemes] = await Promise.all([
     prisma.car.findMany({ include: { images: { orderBy: { sortOrder: "asc" } } }, orderBy: { id: "asc" } }),
     prisma.booking.findMany({ orderBy: { id: "asc" } }),
@@ -80,16 +85,14 @@ export async function getAdminState(): Promise<AdminStatePayload> {
     return_date: booking.returnDate.toISOString().slice(0, 10),
     car_id: booking.carId,
     status: booking.status,
+    price_per_day_snapshot: booking.pricePerDaySnapshot,
+    total_amount_snapshot: booking.totalAmountSnapshot,
+    currency_code: booking.currencyCode,
   }));
 
   const totalRevenue = bookings
     .filter((b) => b.status === "confirmed")
-    .reduce((sum, booking) => {
-      const car = cars.find((c) => c.id === booking.carId);
-      if (!car) return sum;
-      const days = Math.max(1, Math.ceil((booking.returnDate.getTime() - booking.pickupDate.getTime()) / 86400000));
-      return sum + days * car.pricePerDay;
-    }, 0);
+    .reduce((sum, booking) => sum + booking.totalAmountSnapshot, 0);
 
   const mappedStats: DashboardStats = {
     total_revenue: Math.round(totalRevenue),
@@ -113,6 +116,8 @@ export async function getAdminState(): Promise<AdminStatePayload> {
       accent_color: theme.accentColor,
       background_color: theme.backgroundColor,
       text_color: theme.textColor,
+      footer_background_color: theme.footerBackgroundColor,
+      footer_text_color: theme.footerTextColor,
       font_family: theme.fontFamily,
       heading_font: theme.headingFont,
       border_radius: theme.borderRadius,

@@ -1,11 +1,36 @@
 import type { Metadata } from "next";
 import "../index.css";
 import Providers from "./providers";
+import { prisma } from "@/lib/prisma";
+import { DEFAULT_SITE_NAME } from "@/data/site-config";
 
-export const metadata: Metadata = {
-  title: "RentFlow - Car Rental Platform",
-  description: "Premium car rental website builder and management platform",
-};
+const asLocalized = (value: unknown): { fr?: string; en?: string; ar?: string } =>
+  typeof value === "object" && value !== null ? (value as { fr?: string; en?: string; ar?: string }) : {};
+
+export async function generateMetadata(): Promise<Metadata> {
+  const fallbackTitle = `${DEFAULT_SITE_NAME} - Car Rental Platform`;
+  const fallbackDescription = "Premium car rental website builder and management platform";
+
+  try {
+    const [siteConfig, seo] = await Promise.all([
+      prisma.siteConfig.findUnique({ where: { id: "default" }, select: { logoText: true } }),
+      prisma.sEOConfig.findUnique({ where: { id: "default" }, select: { title: true, description: true } }),
+    ]);
+
+    const seoTitle = asLocalized(seo?.title).en || asLocalized(seo?.title).fr || siteConfig?.logoText;
+    const seoDescription = asLocalized(seo?.description).en || asLocalized(seo?.description).fr;
+
+    return {
+      title: seoTitle || fallbackTitle,
+      description: seoDescription || fallbackDescription,
+    };
+  } catch {
+    return {
+      title: fallbackTitle,
+      description: fallbackDescription,
+    };
+  }
+}
 
 export default function RootLayout({
   children,

@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import type { Language, City, Agency } from "@/data/site-config";
 import { Upload, X, Plus, Pencil, Trash2, MapPin } from "lucide-react";
 
 const langs: Language[] = ["fr", "en", "ar"];
+type PartialLocalized = Partial<Record<Language, string>>;
 
 const ImageUpload = ({ value, onChange, label, previewHeight = "h-24" }: { value: string; onChange: (v: string) => void; label: string; previewHeight?: string }) => {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -49,7 +50,15 @@ const ImageUpload = ({ value, onChange, label, previewHeight = "h-24" }: { value
 };
 
 const SiteSettingsManager = () => {
-  const { siteConfig, updateSiteConfig, contact, updateContact, addAgency, updateAgency, deleteAgency, seo, updateSEO, estimation, updateEstimation, bookingForm, updateBookingForm, cities, addCity, updateCity, deleteCity } = useAdmin();
+  const {
+    siteConfig, updateSiteConfig,
+    contact, updateContact, addAgency, updateAgency, deleteAgency,
+    seo, updateSEO,
+    estimation, updateEstimation,
+    bookingForm, updateBookingForm,
+    cities, addCity, updateCity, deleteCity,
+    sections, updateSection,
+  } = useAdmin();
   const [activeLang, setActiveLang] = useState<Language>("fr");
   const [editingCity, setEditingCity] = useState<City | "new" | null>(null);
   const [cityForm, setCityForm] = useState<Omit<City, "id">>({ name: { fr: "", en: "", ar: "" }, image: "", enabled: true });
@@ -58,6 +67,72 @@ const SiteSettingsManager = () => {
     name: { fr: "", en: "", ar: "" }, address: { fr: "", en: "", ar: "" },
     lat: 33.57, lng: -7.59, phone: "", google_maps_url: "", enabled: true,
   });
+
+  const estimationSection = sections.find((s) => s.type === "estimation");
+  const estimationSectionContent = useMemo(() => {
+    if (!estimationSection?.content) return {};
+    try {
+      const parsed = JSON.parse(estimationSection.content);
+      return typeof parsed === "object" && parsed !== null ? parsed : {};
+    } catch {
+      return {};
+    }
+  }, [estimationSection?.content]);
+
+  const estimationButtonLabelValue = (() => {
+    const label = (estimationSectionContent as { button_label?: unknown }).button_label;
+    if (typeof label === "string") return label;
+    if (typeof label === "object" && label !== null) {
+      const localized = label as Partial<Record<Language, string>>;
+      return localized[activeLang] || localized.fr || "";
+    }
+    return "";
+  })();
+
+  const updateEstimationButtonLabel = (value: string) => {
+    if (!estimationSection) return;
+    const label = (estimationSectionContent as { button_label?: unknown }).button_label;
+    const localized = typeof label === "object" && label !== null
+      ? (label as Partial<Record<Language, string>>)
+      : {};
+    const nextContent = {
+      ...estimationSectionContent,
+      button_label: {
+        ...localized,
+        [activeLang]: value,
+      },
+    };
+    updateSection(estimationSection.id, { content: JSON.stringify(nextContent) });
+  };
+
+  const insuranceModalContent = ((estimationSectionContent as { insurance_modal?: unknown }).insurance_modal ?? {}) as Record<string, unknown>;
+  const getLocalizedFieldValue = (field: string) => {
+    const raw = insuranceModalContent[field];
+    if (typeof raw === "string") return raw;
+    if (typeof raw === "object" && raw !== null) {
+      const localized = raw as PartialLocalized;
+      return localized[activeLang] || localized.fr || localized.en || "";
+    }
+    return "";
+  };
+  const updateInsuranceModalField = (field: string, value: string) => {
+    if (!estimationSection) return;
+    const raw = insuranceModalContent[field];
+    const localized = typeof raw === "object" && raw !== null
+      ? (raw as PartialLocalized)
+      : {};
+    const nextContent = {
+      ...estimationSectionContent,
+      insurance_modal: {
+        ...insuranceModalContent,
+        [field]: {
+          ...localized,
+          [activeLang]: value,
+        },
+      },
+    };
+    updateSection(estimationSection.id, { content: JSON.stringify(nextContent) });
+  };
 
   const openCityEditor = (city: City | "new") => {
     if (city === "new") {
@@ -304,6 +379,71 @@ const SiteSettingsManager = () => {
               onChange={(e) => updateEstimation({ whatsapp_message_template: e.target.value })}
               className="mt-1 bg-secondary border-border text-xs" rows={4} />
             <p className="text-[10px] text-muted-foreground mt-1">Variables : {"{vehicle}"}, {"{duration}"}, {"{total}"}, {"{currency}"}, {"{city}"}, {"{date}"}</p>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Texte du bouton ({activeLang.toUpperCase()})</Label>
+            <Input
+              value={estimationButtonLabelValue}
+              onChange={(e) => updateEstimationButtonLabel(e.target.value)}
+              className="mt-1 bg-secondary border-border"
+              placeholder="Confirmer le prix sur WhatsApp"
+              dir={activeLang === "ar" ? "rtl" : "ltr"}
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">Ce texte s’affiche sur le bouton du formulaire "Calculez Votre Budget".</p>
+          </div>
+          <div className="pt-2 border-t border-border space-y-3">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Modal Assurance & Caution ({activeLang.toUpperCase()})</p>
+            <div>
+              <Label className="text-xs text-muted-foreground">Titre du modal</Label>
+              <Input
+                value={getLocalizedFieldValue("title")}
+                onChange={(e) => updateInsuranceModalField("title", e.target.value)}
+                className="mt-1 bg-secondary border-border"
+                dir={activeLang === "ar" ? "rtl" : "ltr"}
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Description</Label>
+              <Textarea
+                value={getLocalizedFieldValue("description")}
+                onChange={(e) => updateInsuranceModalField("description", e.target.value)}
+                className="mt-1 bg-secondary border-border text-xs"
+                rows={3}
+                dir={activeLang === "ar" ? "rtl" : "ltr"}
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Section "Avec caution"</Label>
+              <Textarea
+                value={getLocalizedFieldValue("with_caution")}
+                onChange={(e) => updateInsuranceModalField("with_caution", e.target.value)}
+                className="mt-1 bg-secondary border-border text-xs"
+                rows={4}
+                dir={activeLang === "ar" ? "rtl" : "ltr"}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Une ligne par point.</p>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Section "Sans caution"</Label>
+              <Textarea
+                value={getLocalizedFieldValue("without_caution")}
+                onChange={(e) => updateInsuranceModalField("without_caution", e.target.value)}
+                className="mt-1 bg-secondary border-border text-xs"
+                rows={4}
+                dir={activeLang === "ar" ? "rtl" : "ltr"}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Une ligne par point.</p>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Label du bouton</Label>
+              <Input
+                value={getLocalizedFieldValue("button_label")}
+                onChange={(e) => updateInsuranceModalField("button_label", e.target.value)}
+                className="mt-1 bg-secondary border-border"
+                dir={activeLang === "ar" ? "rtl" : "ltr"}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Texte affiché sur le bouton qui ouvre le modal.</p>
+            </div>
           </div>
         </div>
 

@@ -32,8 +32,11 @@ const tabs: { id: Tab; label: string }[] = [
 const Admin = () => {
   const [active, setActive] = useState<Tab>("overview");
   const [cmdOpen, setCmdOpen] = useState(false);
-  const { theme, adminDarkMode, setAdminDarkMode, isAuthenticated, logout } = useAdmin();
+  const { theme, siteConfig, adminDarkMode, setAdminDarkMode, isAuthenticated, logout, stateReady, stateError } = useAdmin();
   const router = useRouter();
+  const openSiteInNewTab = () => {
+    window.open("/", "_blank", "noopener,noreferrer");
+  };
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -74,6 +77,23 @@ const Admin = () => {
   }, [adminDarkMode]);
 
   if (!isAuthenticated) return <Login />;
+  if (!stateReady) {
+    return (
+      <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">
+        Chargement des donnees...
+      </div>
+    );
+  }
+  if (stateError) {
+    return (
+      <div className="min-h-screen grid place-items-center px-4 text-center">
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-red-500">Connexion a la base de donnees impossible.</p>
+          <p className="text-xs text-muted-foreground">{stateError}</p>
+        </div>
+      </div>
+    );
+  }
 
   const adminBorder = adminDarkMode ? "hsl(220 15% 18%)" : "hsl(220 10% 88%)";
   const adminMuted = adminDarkMode ? "hsl(220 10% 50%)" : "hsl(220 10% 45%)";
@@ -109,7 +129,7 @@ const Admin = () => {
           <div className="flex items-center gap-3 sm:gap-6">
             <button onClick={() => router.push("/")} className="flex items-center gap-2 group">
               <span className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold" style={{ background: `hsl(${theme.primary_color})`, color: "hsl(220 20% 7%)" }}>R</span>
-              <span className="font-display font-semibold text-sm hidden sm:inline">{theme.site_name}</span>
+              <span className="font-display font-semibold text-sm hidden sm:inline">{siteConfig.logo_text || theme.site_name}</span>
             </button>
             <nav className="hidden lg:flex items-center gap-1">
               {tabs.map(t => (
@@ -134,7 +154,7 @@ const Admin = () => {
               <span className="hidden md:inline">Rechercher…</span>
               <kbd className="text-[10px] px-1.5 py-0.5 rounded hidden md:inline" style={{ background: adminDarkMode ? "hsl(220 15% 20%)" : "hsl(220 10% 88%)" }}>⌘K</kbd>
             </button>
-            <button onClick={() => router.push("/")} className="hidden sm:flex px-3 py-1.5 rounded-lg text-xs font-medium transition-colors items-center gap-1.5"
+            <button onClick={openSiteInNewTab} className="hidden sm:flex px-3 py-1.5 rounded-lg text-xs font-medium transition-colors items-center gap-1.5"
               style={{ background: `hsl(${theme.primary_color})`, color: "hsl(220 20% 7%)" }}>
               <ExternalLink size={12} /> <span className="hidden md:inline">Voir le site</span>
             </button>
@@ -165,7 +185,7 @@ const Admin = () => {
                     </button>
                   ))}
                   <div className="border-t my-3" style={{ borderColor: adminBorder }} />
-                  <button onClick={() => router.push("/")} className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2" style={{ color: adminMuted }}>
+                  <button onClick={openSiteInNewTab} className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2" style={{ color: adminMuted }}>
                     <ExternalLink size={14} /> Voir le site
                   </button>
                   <button onClick={() => setCmdOpen(true)} className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2" style={{ color: adminMuted }}>
@@ -211,7 +231,7 @@ const Admin = () => {
             ))}
           </CommandGroup>
           <CommandGroup heading="Actions">
-            <CommandItem onSelect={() => { router.push("/"); setCmdOpen(false); }}>Voir le site</CommandItem>
+            <CommandItem onSelect={() => { openSiteInNewTab(); setCmdOpen(false); }}>Voir le site</CommandItem>
             <CommandItem onSelect={() => { setAdminDarkMode(!adminDarkMode); setCmdOpen(false); }}>Basculer le mode sombre</CommandItem>
           </CommandGroup>
         </CommandList>

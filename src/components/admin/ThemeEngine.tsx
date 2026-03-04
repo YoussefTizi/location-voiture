@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import type { ExtendedThemeConfig, CardStyleVariant, LandingPageTheme } from "@/data/site-config";
-import { landingPageThemePresets } from "@/data/site-config";
+import { initialExtendedTheme, landingPageThemePresets } from "@/data/site-config";
 import { useState, useRef } from "react";
 import { Check, Upload, X, Image as ImageIcon } from "lucide-react";
 import HeroBackgroundEditor from "./HeroBackgroundEditor";
@@ -87,7 +87,16 @@ const ThemeEngine = () => {
 
   const applyLandingTheme = (themeKey: LandingPageTheme) => {
     const preset = landingPageThemePresets[themeKey];
-    updateTheme({ ...preset.overrides, landing_page_theme: themeKey });
+    const fullPresetTheme: ExtendedThemeConfig = {
+      ...initialExtendedTheme,
+      ...preset.overrides,
+      landing_page_theme: themeKey,
+      footer_background_color: preset.overrides.footer_background_color ?? preset.overrides.secondary_color ?? initialExtendedTheme.footer_background_color,
+      footer_text_color: preset.overrides.footer_text_color ?? preset.overrides.text_color ?? initialExtendedTheme.footer_text_color,
+    };
+    const idx = radiusValues.indexOf(fullPresetTheme.border_radius);
+    if (idx >= 0) setRadiusIndex(idx);
+    updateTheme(fullPresetTheme);
   };
 
   const cardVariants: { id: CardStyleVariant; label: string; desc: string }[] = [
@@ -147,6 +156,8 @@ const ThemeEngine = () => {
               <ColorPicker label="Accent" value={theme.accent_color} onChange={(v) => updateTheme({ accent_color: v })} />
               <ColorPicker label="Arrière-plan" value={theme.background_color} onChange={(v) => updateTheme({ background_color: v })} />
               <ColorPicker label="Texte" value={theme.text_color} onChange={(v) => updateTheme({ text_color: v })} />
+              <ColorPicker label="Fond Footer" value={theme.footer_background_color} onChange={(v) => updateTheme({ footer_background_color: v })} />
+              <ColorPicker label="Texte Footer" value={theme.footer_text_color} onChange={(v) => updateTheme({ footer_text_color: v })} />
             </div>
           </div>
 

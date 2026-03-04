@@ -6,9 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { Car } from "@/data/mock-database";
-import { Upload, X, Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { Upload, X, Star, ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from "lucide-react";
 
 const categoryColors: Record<string, string> = {
   Sedan: "bg-blue-500/10 text-blue-600",
@@ -29,6 +29,11 @@ const statusLabels: Record<string, string> = {
   available: "Disponible",
   rented: "Loué",
   maintenance: "Maintenance",
+};
+
+type CategoryItem = {
+  id: string;
+  name: string;
 };
 
 const emptyCar: Omit<Car, "id"> = {
@@ -109,13 +114,46 @@ const ImageManager = ({ images, onChange }: { images: string[]; onChange: (imgs:
 };
 
 /* ─── Car Form ─── */
-const CarForm = ({ initial, onSave, onClose }: {
+const CarForm = ({ initial, onSave, onClose, categories, onManageCategories }: {
   initial?: Car;
-  onSave: (data: Omit<Car, "id"> & { id?: string }) => void;
+  onSave: (data: Omit<Car, "id">) => void;
   onClose: () => void;
+  categories: string[];
+  onManageCategories: () => void;
 }) => {
   const [form, setForm] = useState(initial || emptyCar);
+  const [error, setError] = useState("");
+  const categoryOptions = useMemo(() => {
+    const set = new Set(categories);
+    if (form.category.trim()) set.add(form.category.trim());
+    return Array.from(set);
+  }, [categories, form.category]);
   const up = (patch: Partial<typeof form>) => setForm(p => ({ ...p, ...patch }));
+  const handleSave = () => {
+    if (!form.name.trim()) {
+      setError("Le nom du véhicule est obligatoire.");
+      return;
+    }
+    if (!form.category.trim()) {
+      setError("La catégorie est obligatoire.");
+      return;
+    }
+    if (!Number.isFinite(form.price_per_day) || form.price_per_day < 0) {
+      setError("Le prix/jour doit être un nombre valide (>= 0).");
+      return;
+    }
+    if (!Number.isFinite(form.seats) || form.seats < 1) {
+      setError("Le nombre de places doit être au moins 1.");
+      return;
+    }
+    setError("");
+    onSave({
+      ...form,
+      name: form.name.trim(),
+      category: form.category.trim(),
+      description: form.description.trim(),
+    });
+  };
 
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
@@ -125,15 +163,20 @@ const CarForm = ({ initial, onSave, onClose }: {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label className="text-xs text-muted-foreground">Catégorie</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Catégorie</Label>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={onManageCategories}>
+              Gerer
+            </Button>
+          </div>
           <Select value={form.category} onValueChange={(v) => up({ category: v })}>
             <SelectTrigger className="mt-1 bg-secondary border-border"><SelectValue /></SelectTrigger>
-            <SelectContent>{["Sedan", "SUV", "Sports", "Compact", "Electric", "Wagon"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+            <SelectContent>{categoryOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div>
           <Label className="text-xs text-muted-foreground">Prix / Jour (DH)</Label>
-          <Input type="number" value={form.price_per_day} onChange={(e) => up({ price_per_day: +e.target.value })} className="mt-1 bg-secondary border-border" />
+          <Input type="number" value={form.price_per_day} onChange={(e) => up({ price_per_day: Number(e.target.value) || 0 })} className="mt-1 bg-secondary border-border" />
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3">
@@ -153,7 +196,7 @@ const CarForm = ({ initial, onSave, onClose }: {
         </div>
         <div>
           <Label className="text-xs text-muted-foreground">Places</Label>
-          <Input type="number" value={form.seats} onChange={(e) => up({ seats: +e.target.value })} className="mt-1 bg-secondary border-border" />
+          <Input type="number" value={form.seats} onChange={(e) => up({ seats: Number(e.target.value) || 0 })} className="mt-1 bg-secondary border-border" />
         </div>
       </div>
       <div className="flex items-center justify-between">
@@ -176,9 +219,10 @@ const CarForm = ({ initial, onSave, onClose }: {
         <Label className="text-xs text-muted-foreground">Description</Label>
         <Textarea value={form.description} onChange={(e) => up({ description: e.target.value })} className="mt-1 bg-secondary border-border" rows={2} />
       </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="ghost" size="sm" className="text-xs" onClick={onClose}>Annuler</Button>
-        <Button size="sm" className="text-xs" onClick={() => onSave(form)}>Enregistrer</Button>
+        <Button size="sm" className="text-xs" onClick={handleSave}>Enregistrer</Button>
       </div>
     </div>
   );
@@ -187,19 +231,147 @@ const CarForm = ({ initial, onSave, onClose }: {
 /* ─── Main ─── */
 const CarsManager = () => {
   const { cars, addCar, updateCar, deleteCar } = useAdmin();
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<CategoryItem | "new" | null>(null);
+  const [categoryDraft, setCategoryDraft] = useState("");
+  const [categoryError, setCategoryError] = useState("");
   const [editing, setEditing] = useState<Car | "new" | null>(null);
   const [filter, setFilter] = useState("all");
+  const [saveError, setSaveError] = useState("");
+  const [savingNewCar, setSavingNewCar] = useState(false);
 
-  const categories = ["all", ...Array.from(new Set(cars.map(c => c.category)))];
+  const loadCategories = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/categories");
+      if (!res.ok) throw new Error("Impossible de charger les categories.");
+      const data = await res.json();
+      setCategories(Array.isArray(data) ? data : []);
+      setCategoryError("");
+    } catch {
+      setCategoryError("Impossible de charger les categories.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCategories();
+  }, [loadCategories]);
+
+  const availableCategories = useMemo(() => {
+    const set = new Set<string>();
+    categories.forEach((c) => {
+      if (typeof c.name === "string" && c.name.trim()) set.add(c.name.trim());
+    });
+    cars.forEach((c) => {
+      if (c.category.trim()) set.add(c.category.trim());
+    });
+    return Array.from(set);
+  }, [cars, categories]);
+
+  const filterCategories = ["all", ...availableCategories];
   const filtered = filter === "all" ? cars : cars.filter(c => c.category === filter);
 
-  const handleSave = (data: any) => {
-    if (editing === "new") {
-      addCar({ ...data, id: `car-${Date.now()}` });
-    } else if (editing && typeof editing === "object") {
-      updateCar(editing.id, data);
+  const openNewCategory = () => {
+    setEditingCategory("new");
+    setCategoryDraft("");
+    setCategoryError("");
+  };
+
+  const openEditCategory = (category: CategoryItem) => {
+    setEditingCategory(category);
+    setCategoryDraft(category.name);
+    setCategoryError("");
+  };
+
+  const saveCategory = async () => {
+    const name = categoryDraft.trim();
+    if (!name) {
+      setCategoryError("Le nom de categorie est obligatoire.");
+      return;
     }
+
+    try {
+      if (editingCategory === "new") {
+        const res = await fetch("/api/admin/categories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(typeof payload?.error === "string" ? payload.error : "Impossible de creer la categorie.");
+        }
+      } else if (editingCategory && typeof editingCategory === "object") {
+        const res = await fetch(`/api/admin/categories/${editingCategory.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(typeof payload?.error === "string" ? payload.error : "Impossible de modifier la categorie.");
+        }
+      }
+
+      setEditingCategory(null);
+      setCategoryDraft("");
+      setCategoryError("");
+      await loadCategories();
+    } catch (error) {
+      setCategoryError(error instanceof Error ? error.message : "Impossible d'enregistrer la categorie.");
+    }
+  };
+
+  const handleDeleteCategory = async (category: CategoryItem) => {
+    const ok = window.confirm(`Supprimer la categorie "${category.name}" ?`);
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/admin/categories/${category.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(typeof payload?.error === "string" ? payload.error : "Impossible de supprimer la categorie.");
+      }
+      if (filter === category.name) setFilter("all");
+      await loadCategories();
+      setCategoryError("");
+    } catch (error) {
+      setCategoryError(error instanceof Error ? error.message : "Impossible de supprimer la categorie.");
+    }
+  };
+
+  const handleSave = async (data: Omit<Car, "id">) => {
+    if (editing === "new") {
+      setSavingNewCar(true);
+      setSaveError("");
+      const result = await addCar(data);
+      setSavingNewCar(false);
+      if (!result.ok) {
+        setSaveError(result.error || "Impossible d’enregistrer le véhicule.");
+        return;
+      }
+    } else if (editing && typeof editing === "object") {
+      setSaveError("");
+      const result = await updateCar(editing.id, data);
+      if (!result.ok) {
+        setSaveError(result.error || "Impossible de mettre à jour le véhicule.");
+        return;
+      }
+    }
+    setSaveError("");
+    await loadCategories();
     setEditing(null);
+  };
+
+  const handleDelete = async (carId: string) => {
+    const ok = window.confirm("Supprimer ce véhicule ?");
+    if (!ok) return;
+    setSaveError("");
+    const result = await deleteCar(carId);
+    if (!result.ok) {
+      setSaveError(result.error || "Impossible de supprimer le véhicule.");
+      return;
+    }
+    setSaveError("");
   };
 
   return (
@@ -213,7 +385,7 @@ const CarsManager = () => {
       </div>
 
       <div className="flex gap-1 flex-wrap">
-        {categories.map(c => (
+        {filterCategories.map(c => (
           <button key={c} onClick={() => setFilter(c)} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${filter === c ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
             {c === "all" ? "Tous" : c}
           </button>
@@ -244,24 +416,71 @@ const CarsManager = () => {
                 <span className="text-sm font-bold text-primary">{car.price_per_day} DH/jour</span>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={() => setEditing(car)}>Modifier</Button>
-                  <Button variant="ghost" size="sm" className="text-xs h-6 px-2 text-destructive hover:text-destructive" onClick={() => deleteCar(car.id)}>Supprimer</Button>
+                  <Button variant="ghost" size="sm" className="text-xs h-6 px-2 text-destructive hover:text-destructive" onClick={() => { void handleDelete(car.id); }}>Supprimer</Button>
                 </div>
               </div>
             </div>
           </div>
         ))}
       </div>
+      {saveError && <p className="text-xs text-red-500">{saveError}</p>}
 
-      <Dialog open={!!editing} onOpenChange={() => setEditing(null)}>
+      <Dialog open={!!editing} onOpenChange={() => { setEditing(null); setSaveError(""); setSavingNewCar(false); }}>
         <DialogContent className="bg-card border-border max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display">{editing === "new" ? "Ajouter un véhicule" : "Modifier le véhicule"}</DialogTitle>
           </DialogHeader>
           <CarForm
             initial={editing && editing !== "new" ? editing : undefined}
-            onSave={handleSave}
+            categories={availableCategories}
+            onManageCategories={() => setCategoryDialogOpen(true)}
+            onSave={(payload) => { void handleSave(payload); }}
             onClose={() => setEditing(null)}
           />
+          {editing === "new" && savingNewCar && <p className="text-xs text-muted-foreground">Enregistrement du véhicule...</p>}
+          {saveError && <p className="text-xs text-red-500">{saveError}</p>}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={categoryDialogOpen} onOpenChange={(open) => { setCategoryDialogOpen(open); if (!open) { setEditingCategory(null); setCategoryDraft(""); } }}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Gestion des categories</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {categories.map((category) => (
+                <div key={category.id} className="flex items-center justify-between rounded-md border border-border p-2">
+                  <span className="text-sm">{category.name}</span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditCategory(category)}>
+                      <Pencil size={12} />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => { void handleDeleteCategory(category); }}>
+                      <Trash2 size={12} />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {editingCategory ? (
+              <div className="space-y-2 rounded-md border border-border p-3">
+                <Label className="text-xs text-muted-foreground">{editingCategory === "new" ? "Nouvelle categorie" : "Renommer la categorie"}</Label>
+                <Input value={categoryDraft} onChange={(e) => setCategoryDraft(e.target.value)} placeholder="Ex: SUV Premium" />
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => { setEditingCategory(null); setCategoryDraft(""); }}>Annuler</Button>
+                  <Button size="sm" onClick={() => { void saveCategory(); }}>Enregistrer</Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" className="text-xs gap-1" onClick={openNewCategory}>
+                <Plus size={12} /> Ajouter une categorie
+              </Button>
+            )}
+
+            {categoryError && <p className="text-xs text-red-500">{categoryError}</p>}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
