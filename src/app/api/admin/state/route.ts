@@ -87,6 +87,7 @@ export async function PUT(req: NextRequest) {
             logoText: s.logo_text,
             logoImage: s.logo_image,
             logoDisplayMode: s.logo_display_mode,
+            logoSize: Math.max(32, Math.min(260, Number(s.logo_size) || 96)),
             logoTagline: s.logo_tagline,
             heroBackgroundImage: s.hero_background_image,
             heroSideImage: s.hero_side_image,

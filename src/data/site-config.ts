@@ -72,6 +72,7 @@ export interface SiteConfig {
   logo_text: string;
   logo_image: string;
   logo_display_mode: "text" | "image";
+  logo_size: number;
   logo_tagline: LocalizedText;
   hero_background_image: string;
   hero_side_image: string;
@@ -355,6 +356,7 @@ export const initialSiteConfig: SiteConfig = {
   logo_text: DEFAULT_SITE_NAME,
   logo_image: "",
   logo_display_mode: "text",
+  logo_size: 96,
   logo_tagline: { fr: "Location premium au Maroc", en: "Premium rental in Morocco", ar: "تأجير فاخر في المغرب" },
   hero_background_image: "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=1920&h=1080&fit=crop",
   hero_side_image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&h=600&fit=crop",

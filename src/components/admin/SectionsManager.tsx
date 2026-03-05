@@ -9,15 +9,40 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import type { ExtendedSectionConfig, Language } from "@/data/site-config";
-import { GripVertical, Eye, EyeOff, Pencil, Navigation } from "lucide-react";
+import {
+  GripVertical, Eye, EyeOff, Pencil, Navigation,
+  Shield, CreditCard, Truck, Sparkles, CheckCircle2, MapPin, Users,
+  Fuel, Settings2, Car as CarIcon, Calendar, Clock, Zap, Headphones, Gem, MessageCircle,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import FAQEditor from "./FAQEditor";
 import TestimonialsEditor from "./TestimonialsEditor";
 import FeaturesEditor from "./FeaturesEditor";
 import CTAEditor from "./CTAEditor";
 
 const langs: Language[] = ["fr", "en", "ar"];
+const heroTitleDefaultColors = { line1: "#FFFFFF", line2: "#FF4D4D" };
+const heroIconChoices: Array<{ name: string; Icon: LucideIcon }> = [
+  { name: "Shield", Icon: Shield },
+  { name: "CreditCard", Icon: CreditCard },
+  { name: "Truck", Icon: Truck },
+  { name: "Sparkles", Icon: Sparkles },
+  { name: "CheckCircle2", Icon: CheckCircle2 },
+  { name: "MapPin", Icon: MapPin },
+  { name: "Users", Icon: Users },
+  { name: "Fuel", Icon: Fuel },
+  { name: "Settings2", Icon: Settings2 },
+  { name: "Car", Icon: CarIcon },
+  { name: "Calendar", Icon: Calendar },
+  { name: "Clock", Icon: Clock },
+  { name: "Zap", Icon: Zap },
+  { name: "Headphones", Icon: Headphones },
+  { name: "Gem", Icon: Gem },
+  { name: "MessageCircle", Icon: MessageCircle },
+];
 type LocalizedText = Record<Language, string>;
 type HeroConfig = {
+  title_colors: { line1: string; line2: string; line3: string };
   badge_text: LocalizedText;
   primary_cta: { enabled: boolean; action: "whatsapp" | "anchor" | "link"; href: string; label: LocalizedText };
   secondary_cta: { enabled: boolean; action: "whatsapp" | "anchor" | "link"; href: string; label: LocalizedText };
@@ -31,6 +56,7 @@ type HeroConfig = {
 const emptyLocalized = (): LocalizedText => ({ fr: "", en: "", ar: "" });
 
 const defaultHeroConfig = (): HeroConfig => ({
+  title_colors: { line1: "", line2: "", line3: "" },
   badge_text: emptyLocalized(),
   primary_cta: { enabled: true, action: "whatsapp", href: "", label: emptyLocalized() },
   secondary_cta: { enabled: true, action: "anchor", href: "#cars", label: emptyLocalized() },
@@ -53,6 +79,7 @@ const parseHeroConfig = (raw: string): HeroConfig => {
     return {
       ...base,
       ...parsed,
+      title_colors: { ...base.title_colors, ...(parsed?.title_colors ?? {}) },
       badge_text: { ...base.badge_text, ...(parsed?.badge_text ?? {}) },
       primary_cta: {
         ...base.primary_cta,
@@ -81,6 +108,7 @@ const SectionsManager = () => {
   const [editing, setEditing] = useState<string | null>(null);
   const [editLang, setEditLang] = useState<Language>("fr");
   const [showNavManager, setShowNavManager] = useState(false);
+  const [activeHeroIconIndex, setActiveHeroIconIndex] = useState(0);
 
   const sorted = [...sections].sort((a, b) => a.order - b.order);
   const editingSection = sections.find((s) => s.id === editing);
@@ -126,8 +154,12 @@ const SectionsManager = () => {
       </div>
 
       {/* Section Edit */}
-      <Dialog open={!!editing} onOpenChange={() => setEditing(null)}>
-        <DialogContent className="bg-card border-border max-w-lg max-h-[85vh] overflow-y-auto">
+      <Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null); }}>
+        <DialogContent
+          className="bg-card border-border max-w-lg max-h-[85vh] overflow-y-auto"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader><DialogTitle className="font-display">Modifier la section</DialogTitle></DialogHeader>
           {editingSection && (
             <div className="space-y-4">
@@ -182,6 +214,69 @@ const SectionsManager = () => {
               {editingSection.type === "hero" && heroConfig && (
                 <div className="border-t border-border pt-4 space-y-4">
                   <p className="text-xs font-medium text-muted-foreground">Configuration Hero</p>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Titre Hero ({editLang.toUpperCase()})</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={(editingSection.title[editLang] || "").split("\n")[0] || ""}
+                        onChange={(e) => {
+                          const parts = (editingSection.title[editLang] || "").split("\n");
+                          const line1 = e.target.value;
+                          const line2 = parts[1] || "";
+                          updateSection(editingSection.id, {
+                            title: { ...editingSection.title, [editLang]: `${line1}\n${line2}`.trim() },
+                          });
+                        }}
+                        className="bg-secondary border-border"
+                        placeholder="Ligne 1"
+                      />
+                      <Input
+                        value={(editingSection.title[editLang] || "").split("\n")[1] || ""}
+                        onChange={(e) => {
+                          const parts = (editingSection.title[editLang] || "").split("\n");
+                          const line1 = parts[0] || "";
+                          const line2 = e.target.value;
+                          updateSection(editingSection.id, {
+                            title: { ...editingSection.title, [editLang]: `${line1}\n${line2}`.trim() },
+                          });
+                        }}
+                        className="bg-secondary border-border"
+                        placeholder="Ligne 2"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Couleurs du titre Hero</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-md border border-border bg-secondary/40 p-2">
+                        <p className="text-[10px] text-muted-foreground mb-1">Couleur 1</p>
+                        <Input
+                          type="color"
+                          value={heroConfig.title_colors.line1 || heroTitleDefaultColors.line1}
+                          onChange={(e) => updateHeroContent((prev) => ({
+                            ...prev,
+                            title_colors: { ...prev.title_colors, line1: e.target.value },
+                          }))}
+                          className="h-9 w-full p-1 bg-transparent border-border"
+                        />
+                      </div>
+                      <div className="rounded-md border border-border bg-secondary/40 p-2">
+                        <p className="text-[10px] text-muted-foreground mb-1">Couleur 2</p>
+                        <Input
+                          type="color"
+                          value={heroConfig.title_colors.line2 || heroTitleDefaultColors.line2}
+                          onChange={(e) => updateHeroContent((prev) => ({
+                            ...prev,
+                            title_colors: { ...prev.title_colors, line2: e.target.value },
+                          }))}
+                          className="h-9 w-full p-1 bg-transparent border-border"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <Label className="text-xs text-muted-foreground">Badge ({editLang.toUpperCase()})</Label>
                     <Input
@@ -284,15 +379,21 @@ const SectionsManager = () => {
                     <Label className="text-xs text-muted-foreground">Infos rapides ({editLang.toUpperCase()})</Label>
                     {heroConfig.info_items.slice(0, 3).map((item, idx) => (
                       <div key={idx} className="grid grid-cols-3 gap-2">
-                        <Input
-                          value={item.icon}
-                          onChange={(e) => updateHeroContent((prev) => ({
-                            ...prev,
-                            info_items: prev.info_items.map((it, i) => i === idx ? { ...it, icon: e.target.value } : it),
-                          }))}
-                          className="bg-secondary border-border"
-                          placeholder="Icon"
-                        />
+                        <Button
+                          type="button"
+                          variant={activeHeroIconIndex === idx ? "default" : "outline"}
+                          size="sm"
+                          className="justify-start text-xs gap-1.5"
+                          onClick={() => setActiveHeroIconIndex(idx)}
+                        >
+                          {(() => {
+                            const found = heroIconChoices.find((choice) => choice.name === item.icon);
+                            if (!found) return null;
+                            const IconComp = found.Icon;
+                            return <IconComp size={14} />;
+                          })()}
+                          <span className="truncate">{item.icon || `Info ${idx + 1}`}</span>
+                        </Button>
                         <div className="col-span-2">
                           <Input
                             value={item.label[editLang] || ""}
@@ -306,6 +407,33 @@ const SectionsManager = () => {
                         </div>
                       </div>
                     ))}
+                  </div>
+
+                  <div className="border-t border-border pt-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">Icônes disponibles</Label>
+                      <span className="text-[10px] text-muted-foreground">Cible: info #{Math.min(activeHeroIconIndex + 1, 3)}</span>
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto pr-1">
+                      {heroIconChoices.map(({ name, Icon }) => {
+                        const targetIndex = Math.min(activeHeroIconIndex, 2);
+                        const isCurrent = heroConfig.info_items[targetIndex]?.icon === name;
+                        return (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => updateHeroContent((prev) => ({
+                              ...prev,
+                              info_items: prev.info_items.map((it, i) => i === targetIndex ? { ...it, icon: name } : it),
+                            }))}
+                            className={`rounded-md border px-2 py-2 text-xs flex flex-col items-center gap-1 transition-colors ${isCurrent ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary/30 hover:bg-secondary/60"}`}
+                          >
+                            <Icon size={14} />
+                            <span className="truncate w-full text-center">{name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
@@ -347,6 +475,12 @@ const SectionsManager = () => {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button variant="outline" size="sm" onClick={() => setEditing(null)}>
+                  Fermer
+                </Button>
               </div>
             </div>
           )}

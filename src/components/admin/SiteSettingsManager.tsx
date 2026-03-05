@@ -171,6 +171,11 @@ const SiteSettingsManager = () => {
     setEditingAgency(null);
   };
 
+  const clampLogoSize = (value: number) => {
+    if (!Number.isFinite(value)) return 96;
+    return Math.max(32, Math.min(260, Math.round(value)));
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -203,6 +208,27 @@ const SiteSettingsManager = () => {
             <Input value={siteConfig.logo_text} onChange={(e) => updateSiteConfig({ logo_text: e.target.value })} className="mt-1 bg-secondary border-border" />
           </div>
           <ImageUpload value={siteConfig.logo_image} onChange={(v) => updateSiteConfig({ logo_image: v })} label="Image du logo" previewHeight="h-12" />
+          <div>
+            <Label className="text-xs text-muted-foreground">Taille du logo (px)</Label>
+            <div className="mt-1 flex items-center gap-2">
+              <Input
+                type="number"
+                min={32}
+                max={260}
+                value={siteConfig.logo_size}
+                onChange={(e) => updateSiteConfig({ logo_size: clampLogoSize(Number(e.target.value)) })}
+                className="bg-secondary border-border w-24"
+              />
+              <input
+                type="range"
+                min={32}
+                max={260}
+                value={siteConfig.logo_size}
+                onChange={(e) => updateSiteConfig({ logo_size: clampLogoSize(Number(e.target.value)) })}
+                className="flex-1 accent-primary"
+              />
+            </div>
+          </div>
           <div>
             <Label className="text-xs text-muted-foreground">Slogan ({activeLang.toUpperCase()})</Label>
             <Input value={siteConfig.logo_tagline[activeLang]}

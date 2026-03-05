@@ -61,6 +61,7 @@ export async function ensureAdminStateInitialized(tx: Tx) {
       logoText: initialSiteConfig.logo_text,
       logoImage: initialSiteConfig.logo_image,
       logoDisplayMode: initialSiteConfig.logo_display_mode,
+      logoSize: initialSiteConfig.logo_size,
       logoTagline: initialSiteConfig.logo_tagline,
       heroBackgroundImage: initialSiteConfig.hero_background_image,
       heroSideImage: initialSiteConfig.hero_side_image,

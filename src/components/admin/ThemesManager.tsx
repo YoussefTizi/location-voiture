@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { useAdmin } from "@/context/AdminContext";
-import { landingPageThemePresets, type CustomThemePreset, type LandingPageTheme } from "@/data/site-config";
+import { initialExtendedTheme, landingPageThemePresets, type CustomThemePreset, type LandingPageTheme } from "@/data/site-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,7 +15,7 @@ import { Check, Download, Plus, Star, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 const ThemesManager = () => {
-  const { theme, updateTheme, customThemes, addCustomTheme, deleteCustomTheme } = useAdmin();
+  const { theme, updateTheme, customThemes, addCustomTheme, deleteCustomTheme, sections, updateSection } = useAdmin();
   const [addOpen, setAddOpen] = useState(false);
   const [importError, setImportError] = useState("");
   const [previewData, setPreviewData] = useState<CustomThemePreset | null>(null);
@@ -24,13 +24,38 @@ const ThemesManager = () => {
   const builtInKeys = Object.keys(landingPageThemePresets) as LandingPageTheme[];
 
   const applyTheme = (key: string) => {
+    const heroSection = sections.find((s) => s.type === "hero");
+    if (heroSection?.content?.trim()) {
+      try {
+        const parsed = JSON.parse(heroSection.content) as Record<string, unknown>;
+        if ("title_colors" in parsed) {
+          const { title_colors: _ignored, ...rest } = parsed;
+          updateSection(heroSection.id, { content: JSON.stringify(rest) });
+        }
+      } catch {
+        // keep existing content if invalid JSON
+      }
+    }
+
     const builtIn = landingPageThemePresets[key as LandingPageTheme];
     if (builtIn) {
-      updateTheme({ ...builtIn.overrides, landing_page_theme: key as LandingPageTheme });
+      updateTheme({
+        ...initialExtendedTheme,
+        ...builtIn.overrides,
+        landing_page_theme: key as LandingPageTheme,
+        footer_background_color: builtIn.overrides.footer_background_color ?? builtIn.overrides.secondary_color ?? initialExtendedTheme.footer_background_color,
+        footer_text_color: builtIn.overrides.footer_text_color ?? builtIn.overrides.text_color ?? initialExtendedTheme.footer_text_color,
+      });
     } else {
       const custom = customThemes.find(t => t.id === key);
       if (custom) {
-        updateTheme({ ...custom.overrides, landing_page_theme: key });
+        updateTheme({
+          ...initialExtendedTheme,
+          ...custom.overrides,
+          landing_page_theme: key,
+          footer_background_color: custom.overrides.footer_background_color ?? custom.overrides.secondary_color ?? initialExtendedTheme.footer_background_color,
+          footer_text_color: custom.overrides.footer_text_color ?? custom.overrides.text_color ?? initialExtendedTheme.footer_text_color,
+        });
       }
     }
     toast.success("Thème appliqué !");

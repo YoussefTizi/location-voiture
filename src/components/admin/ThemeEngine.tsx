@@ -73,7 +73,7 @@ const ColorPicker = ({ label, value, onChange }: { label: string; value: string;
 };
 
 const ThemeEngine = () => {
-  const { theme, updateTheme } = useAdmin();
+  const { theme, updateTheme, sections, updateSection } = useAdmin();
   const [radiusIndex, setRadiusIndex] = useState(() => {
     const idx = radiusValues.indexOf(theme.border_radius);
     return idx >= 0 ? idx : 2;
@@ -86,6 +86,19 @@ const ThemeEngine = () => {
   };
 
   const applyLandingTheme = (themeKey: LandingPageTheme) => {
+    const heroSection = sections.find((s) => s.type === "hero");
+    if (heroSection?.content?.trim()) {
+      try {
+        const parsed = JSON.parse(heroSection.content) as Record<string, unknown>;
+        if ("title_colors" in parsed) {
+          const { title_colors: _ignored, ...rest } = parsed;
+          updateSection(heroSection.id, { content: JSON.stringify(rest) });
+        }
+      } catch {
+        // keep existing content if invalid JSON
+      }
+    }
+
     const preset = landingPageThemePresets[themeKey];
     const fullPresetTheme: ExtendedThemeConfig = {
       ...initialExtendedTheme,
