@@ -300,7 +300,7 @@ export const initialFeatures: Feature[] = [
 
 export const initialContact: ContactConfig = {
   phone: "+212 5 22 00 00 00",
-  whatsapp: "+212 6 00 00 00 00",
+  whatsapp: "+212 6 35 08 16 48",
   email: "contact@rentflow.ma",
   address: { fr: "123 Boulevard Mohammed V, Casablanca, Maroc", en: "123 Mohammed V Boulevard, Casablanca, Morocco", ar: "123 شارع محمد الخامس، الدار البيضاء، المغرب" },
   social_links: [
