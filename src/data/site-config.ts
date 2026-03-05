@@ -74,6 +74,7 @@ export interface SiteConfig {
   logo_display_mode: "text" | "image";
   logo_size: number;
   logo_tagline: LocalizedText;
+  theme_preview_images: Record<string, string>;
   hero_background_image: string;
   hero_side_image: string;
   hero_side_image_mode: "image" | "car_showcase";
@@ -126,6 +127,7 @@ export interface CustomThemePreset {
   name: string;
   description: string;
   preview_colors: string[];
+  preview_image?: string;
   overrides: Partial<ExtendedThemeConfig>;
   isCustom: true;
   createdAt: string;
@@ -358,6 +360,7 @@ export const initialSiteConfig: SiteConfig = {
   logo_display_mode: "text",
   logo_size: 96,
   logo_tagline: { fr: "Location premium au Maroc", en: "Premium rental in Morocco", ar: "تأجير فاخر في المغرب" },
+  theme_preview_images: {},
   hero_background_image: "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=1920&h=1080&fit=crop",
   hero_side_image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&h=600&fit=crop",
   hero_side_image_mode: "image",
@@ -556,12 +559,14 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
   name: string;
   description: string;
   preview_colors: string[];
+  preview_image?: string;
   overrides: Partial<ExtendedThemeConfig>;
 }> = {
   elegant: {
     name: "Élégant & Moderne",
     description: "Design épuré avec des tons verts et une typographie moderne",
     preview_colors: ["142 71% 45%", "220 15% 25%", "220 60% 55%"],
+    preview_image: "https://images.unsplash.com/photo-1549924231-f129b911e442?auto=format&fit=crop&w=1200&q=80",
     overrides: {
       primary_color: "142 71% 45%",
       secondary_color: "220 15% 25%",
@@ -578,6 +583,7 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
     name: "Sportif & Dynamique",
     description: "Couleurs vives avec du rouge et un style audacieux",
     preview_colors: ["0 84% 60%", "220 20% 15%", "35 95% 55%"],
+    preview_image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80",
     overrides: {
       primary_color: "0 84% 60%",
       secondary_color: "220 20% 15%",
@@ -594,6 +600,7 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
     name: "Éco & Nature",
     description: "Tons terreux et naturels, ambiance zen et responsable",
     preview_colors: ["160 45% 40%", "40 30% 25%", "45 70% 55%"],
+    preview_image: "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=1200&q=80",
     overrides: {
       primary_color: "160 45% 40%",
       secondary_color: "40 30% 25%",
@@ -610,6 +617,7 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
     name: "Classique & Luxe",
     description: "Bleu marine et or, un style intemporel et raffiné",
     preview_colors: ["220 50% 35%", "220 30% 15%", "43 80% 55%"],
+    preview_image: "https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=1200&q=80",
     overrides: {
       primary_color: "220 50% 35%",
       secondary_color: "220 30% 15%",
@@ -626,6 +634,7 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
     name: "Néon & Cyberpunk",
     description: "Fond sombre, accents néon, ambiance futuriste et audacieuse",
     preview_colors: ["280 80% 55%", "190 100% 50%", "330 85% 60%"],
+    preview_image: "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=1200&q=80",
     overrides: {
       primary_color: "280 80% 55%",
       secondary_color: "220 25% 10%",
@@ -642,6 +651,7 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
     name: "Sunset & Éditorial",
     description: "Tons chauds corail et abricot, mise en page éditoriale élégante",
     preview_colors: ["15 85% 55%", "35 90% 60%", "350 70% 50%"],
+    preview_image: "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80",
     overrides: {
       primary_color: "15 85% 55%",
       secondary_color: "25 30% 20%",
@@ -658,6 +668,7 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
     name: "Arctique & Cristal",
     description: "Bleus glacés, blancs purs, minimalisme épuré et aérien",
     preview_colors: ["200 80% 55%", "210 40% 90%", "180 60% 45%"],
+    preview_image: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80",
     overrides: {
       primary_color: "200 80% 55%",
       secondary_color: "210 40% 90%",
@@ -674,6 +685,7 @@ export const landingPageThemePresets: Record<LandingPageTheme, {
     name: "Désert & Terracotta",
     description: "Tons sable, terracotta et ocre, ambiance organique et chaleureuse",
     preview_colors: ["20 60% 50%", "35 40% 75%", "45 50% 55%"],
+    preview_image: "https://images.unsplash.com/photo-1682686581498-5e85c7228119?auto=format&fit=crop&w=1200&q=80",
     overrides: {
       primary_color: "20 60% 50%",
       secondary_color: "35 25% 20%",
