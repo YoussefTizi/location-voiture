@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import productBox from "@/assets/product-box.png";
 import { Check, Globe, Smartphone, Shield, Zap, Car, Settings, BarChart3, MapPin, MessageSquare, Star, Languages, Palette, Image, ToggleLeft, CreditCard, Layout, Monitor, Search, Lock, Infinity, ChevronDown, ChevronUp, Phone, ArrowRight, Sparkles, Users, TrendingUp, Clock, X, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { landingPageThemePresets } from "@/data/site-config";
 
 type Lang = "fr" | "en" | "ar";
 
@@ -50,6 +51,15 @@ const copy = {
   features: {
     title: { fr: "Tout est inclus. Sans exception.", en: "Everything's included. No exceptions.", ar: "كل شيء مضمّن. بدون استثناء." },
     subtitle: { fr: "+25 fonctionnalités professionnelles pour propulser votre agence.", en: "25+ professional features to propel your agency.", ar: "+25 ميزة احترافية لتعزيز وكالتك." },
+  },
+  demos: {
+    title: { fr: "Aperçu de tous les thèmes", en: "Preview all themes", ar: "معاينة كل القوالب" },
+    subtitle: {
+      fr: "Choisissez un design et ouvrez sa preview avant activation.",
+      en: "Pick a design and open its preview before activation.",
+      ar: "اختر تصميمًا وافتح معاينته قبل التفعيل.",
+    },
+    preview: { fr: "Voir preview", en: "View preview", ar: "عرض المعاينة" },
   },
   pricing: {
     title: { fr: "Un investissement, pas une dépense", en: "An investment, not an expense", ar: "استثمار وليس مصروف" },
@@ -155,6 +165,7 @@ const SalesLanding = () => {
     lang === "ar" ? "مرحبًا، أنا مهتم بحل تأجير السيارات بـ 1199 درهم." :
     "Hello, I'm interested in the car rental solution for 1199 MAD."
   );
+  const demoThemes = Object.entries(landingPageThemePresets);
 
   return (
     <div className="min-h-screen bg-[hsl(220,20%,4%)] text-[hsl(220,15%,90%)] overflow-x-hidden" dir={dir}>
@@ -325,6 +336,37 @@ const SalesLanding = () => {
                     <p className="text-xs text-white/40 leading-relaxed">{t(f.desc, lang)}</p>
                   </div>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── THEMES DEMOS ─── */}
+      <section className="py-20 px-4 border-t border-white/5">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">{t(copy.demos.title, lang)}</h2>
+            <p className="text-white/50">{t(copy.demos.subtitle, lang)}</p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {demoThemes.map(([slug, preset]) => (
+              <div key={slug} className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                  {preset.preview_colors.map((color, i) => (
+                    <span key={`${slug}-${i}`} className="w-5 h-5 rounded-full border border-white/10" style={{ background: `hsl(${color})` }} />
+                  ))}
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">{preset.name}</h3>
+                  <p className="text-xs text-white/50 mt-1 line-clamp-2">{preset.description}</p>
+                </div>
+                <a
+                  href={`/preview/${slug}`}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full border border-[hsl(45,80%,55%)]/30 text-[hsl(45,90%,60%)] text-xs font-semibold px-4 py-2 hover:bg-[hsl(45,80%,55%)]/10 transition-colors"
+                >
+                  {t(copy.demos.preview, lang)} <ArrowRight size={14} />
+                </a>
               </div>
             ))}
           </div>
