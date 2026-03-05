@@ -52,6 +52,9 @@ type HeroConfig = {
   show_car_strip: boolean;
   info_items: Array<{ icon: string; label: LocalizedText }>;
 };
+type CarsSectionConfig = {
+  cards_per_row: 2 | 3 | 4 | 5;
+};
 
 const emptyLocalized = (): LocalizedText => ({ fr: "", en: "", ar: "" });
 
@@ -103,6 +106,25 @@ const parseHeroConfig = (raw: string): HeroConfig => {
   }
 };
 
+const parseJsonObject = (raw: string): Record<string, unknown> => {
+  if (!raw?.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+};
+
+const parseCarsConfig = (raw: string): CarsSectionConfig => {
+  const parsed = parseJsonObject(raw);
+  const value = Number(parsed.cards_per_row);
+  if (value === 2 || value === 3 || value === 4 || value === 5) {
+    return { cards_per_row: value };
+  }
+  return { cards_per_row: 4 };
+};
+
 const SectionsManager = () => {
   const { sections, updateSection, reorderSections, navItems, updateNavItem } = useAdmin();
   const [editing, setEditing] = useState<string | null>(null);
@@ -113,11 +135,18 @@ const SectionsManager = () => {
   const sorted = [...sections].sort((a, b) => a.order - b.order);
   const editingSection = sections.find((s) => s.id === editing);
   const heroConfig = editingSection?.type === "hero" ? parseHeroConfig(editingSection.content) : null;
+  const carsConfig = editingSection?.type === "cars" ? parseCarsConfig(editingSection.content) : null;
 
   const updateHeroContent = (updater: (prev: HeroConfig) => HeroConfig) => {
     if (!editingSection || editingSection.type !== "hero") return;
     const next = updater(parseHeroConfig(editingSection.content));
     updateSection(editingSection.id, { content: JSON.stringify(next) });
+  };
+
+  const updateCarsContent = (patch: Partial<CarsSectionConfig>) => {
+    if (!editingSection || editingSection.type !== "cars") return;
+    const base = parseJsonObject(editingSection.content);
+    updateSection(editingSection.id, { content: JSON.stringify({ ...base, ...patch }) });
   };
 
   return (
@@ -435,6 +464,24 @@ const SectionsManager = () => {
                       })}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {editingSection.type === "cars" && carsConfig && (
+                <div className="border-t border-border pt-4 space-y-2">
+                  <Label className="text-xs text-muted-foreground">Cartes par ligne (desktop)</Label>
+                  <Select
+                    value={String(carsConfig.cards_per_row)}
+                    onValueChange={(v) => updateCarsContent({ cards_per_row: Number(v) as 2 | 3 | 4 | 5 })}
+                  >
+                    <SelectTrigger className="mt-1 bg-secondary border-border"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">2 par ligne</SelectItem>
+                      <SelectItem value="3">3 par ligne</SelectItem>
+                      <SelectItem value="4">4 par ligne</SelectItem>
+                      <SelectItem value="5">5 par ligne</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 

@@ -538,6 +538,14 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   };
 
   const titleParts = lt(config.title).split("\n");
+  const sportyFallbackHeroImage = siteConfig.hero_background_image?.trim() || "";
+  const resolvedHeroBackgroundImage = (
+    theme.hero_background_enabled &&
+    theme.hero_background_type === "image" &&
+    theme.hero_background_image
+  )
+    ? theme.hero_background_image
+    : (lp === "sporty" ? sportyFallbackHeroImage : "");
   type HeroLocalized = { fr: string; en: string; ar: string };
   type HeroCta = { enabled?: boolean; label?: HeroLocalized; action?: "whatsapp" | "anchor" | "link"; href?: string };
   type HeroInfo = { icon: string; label: HeroLocalized };
@@ -760,8 +768,8 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
     return (
       <section id="hero" className="relative min-h-screen flex items-center pt-20" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
         <div className="absolute inset-0 z-0">
-          {theme.hero_background_enabled && theme.hero_background_type === "image" && theme.hero_background_image && (
-            <img src={theme.hero_background_image} alt="" className="w-full h-full object-cover opacity-30" />
+          {resolvedHeroBackgroundImage && (
+            <img src={resolvedHeroBackgroundImage} alt="" className="w-full h-full object-cover opacity-30" />
           )}
           {theme.hero_background_enabled && theme.hero_background_type === "pattern" && (
             <div className="absolute inset-0" style={getHeroBackgroundCSS(theme)} />
@@ -1322,6 +1330,26 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
   const isFlat = theme.flat_design;
   const curCode = theme.selected_currency;
   const variant = theme.card_style_variant;
+  const defaultCardsPerRow = variant === "compact" || variant === "detailed" ? 3 : 4;
+  const carsSectionConfig = (() => {
+    if (!config.content?.trim()) return { cards_per_row: defaultCardsPerRow as 2 | 3 | 4 | 5 };
+    try {
+      const parsed = JSON.parse(config.content);
+      const value = Number(parsed?.cards_per_row);
+      if (value === 2 || value === 3 || value === 4 || value === 5) {
+        return { cards_per_row: value as 2 | 3 | 4 | 5 };
+      }
+    } catch {
+      // ignore invalid content
+    }
+    return { cards_per_row: defaultCardsPerRow as 2 | 3 | 4 | 5 };
+  })();
+  const desktopColsClassByCount: Record<2 | 3 | 4 | 5, string> = {
+    2: "lg:grid-cols-2",
+    3: "lg:grid-cols-3",
+    4: "lg:grid-cols-4",
+    5: "lg:grid-cols-5",
+  };
   const available = cars.filter(c => c.availability_status === "available");
   const categories = useMemo(() => ["all", ...new Set(available.map(c => c.category))], [available]);
   const filtered = activeCategory === "all" ? available : available.filter(c => c.category === activeCategory);
@@ -1662,7 +1690,7 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
             </button>
           ))}
         </div>
-        <div className={`grid gap-5 ${variant === "compact" || variant === "detailed" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"}`}>
+        <div className={`grid gap-5 grid-cols-1 sm:grid-cols-2 ${desktopColsClassByCount[carsSectionConfig.cards_per_row]}`}>
           {filtered.map((car, i) => renderCard(car, i))}
         </div>
       </div>
