@@ -5,6 +5,7 @@ import productBox from "@/assets/product-box.png";
 import { Check, Globe, Smartphone, Shield, Zap, Car, Settings, BarChart3, MapPin, MessageSquare, Star, Languages, Palette, Image, ToggleLeft, CreditCard, Layout, Monitor, Search, Lock, Infinity, ChevronDown, ChevronUp, Phone, ArrowRight, Sparkles, Users, TrendingUp, Clock, X, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { landingPageThemePresets } from "@/data/site-config";
+import { useAdmin } from "@/context/AdminContext";
 
 type Lang = "fr" | "en" | "ar";
 
@@ -144,6 +145,7 @@ const featuresList: { icon: React.ElementType; title: Record<Lang, string>; desc
 // ─── COMPONENTS ──────────────────────────────────────────────
 
 const SalesLanding = () => {
+  const { siteConfig } = useAdmin();
   const [lang, setLang] = useState<Lang>("fr");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -160,12 +162,19 @@ const SalesLanding = () => {
     setMobileMenu(false);
   };
 
-  const whatsappLink = "https://wa.me/212600000000?text=" + encodeURIComponent(
+  const whatsappLink = "https://wa.me/212635081648?text=" + encodeURIComponent(
     lang === "fr" ? "Bonjour, je suis intéressé par la solution de location de voitures à 1199 DH." :
     lang === "ar" ? "مرحبًا، أنا مهتم بحل تأجير السيارات بـ 1199 درهم." :
     "Hello, I'm interested in the car rental solution for 1199 MAD."
   );
   const demoThemes = Object.entries(landingPageThemePresets);
+  const previewImageOverrides = siteConfig.theme_preview_images || {};
+  const getThemePreviewImage = (slug: string, preset: (typeof landingPageThemePresets)[keyof typeof landingPageThemePresets]) => {
+    const override = previewImageOverrides[slug];
+    if (typeof override === "string" && override.trim()) return override.trim();
+    if (typeof preset.preview_image === "string" && preset.preview_image.trim()) return preset.preview_image.trim();
+    return "";
+  };
 
   return (
     <div className="min-h-screen bg-[hsl(220,20%,4%)] text-[hsl(220,15%,90%)] overflow-x-hidden" dir={dir}>
@@ -352,6 +361,16 @@ const SalesLanding = () => {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {demoThemes.map(([slug, preset]) => (
               <div key={slug} className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 flex flex-col gap-4">
+                {getThemePreviewImage(slug, preset) ? (
+                  <div className="h-28 rounded-lg overflow-hidden border border-white/10">
+                    <img src={getThemePreviewImage(slug, preset)} alt={preset.name} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div
+                    className="h-28 rounded-lg border border-white/10"
+                    style={{ background: `linear-gradient(135deg, hsl(${preset.preview_colors[0]}) 0%, hsl(${preset.preview_colors[1]}) 55%, hsl(${preset.preview_colors[2]}) 100%)` }}
+                  />
+                )}
                 <div className="flex items-center gap-2">
                   {preset.preview_colors.map((color, i) => (
                     <span key={`${slug}-${i}`} className="w-5 h-5 rounded-full border border-white/10" style={{ background: `hsl(${color})` }} />

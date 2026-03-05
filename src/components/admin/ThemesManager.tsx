@@ -15,13 +15,38 @@ import { Check, Download, Plus, Star, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 const ThemesManager = () => {
-  const { theme, updateTheme, customThemes, addCustomTheme, deleteCustomTheme, sections, updateSection } = useAdmin();
+  const { theme, updateTheme, customThemes, addCustomTheme, deleteCustomTheme, sections, updateSection, siteConfig, updateSiteConfig } = useAdmin();
   const [addOpen, setAddOpen] = useState(false);
   const [importError, setImportError] = useState("");
   const [previewData, setPreviewData] = useState<CustomThemePreset | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const builtInPreviewFileRef = useRef<HTMLInputElement>(null);
+  const [builtInPreviewTarget, setBuiltInPreviewTarget] = useState<LandingPageTheme | null>(null);
 
   const builtInKeys = Object.keys(landingPageThemePresets) as LandingPageTheme[];
+  const themePreviewOverrides = siteConfig.theme_preview_images || {};
+  const getThemePreviewImage = (preset: { preview_image?: string; overrides: Record<string, unknown> }) =>
+    (typeof preset.preview_image === "string" && preset.preview_image.trim())
+      || (typeof preset.overrides.hero_background_image === "string" ? preset.overrides.hero_background_image : "")
+      || "";
+  const getBuiltInPreviewImage = (key: LandingPageTheme, preset: { preview_image?: string; overrides: Record<string, unknown> }) => {
+    const override = themePreviewOverrides[key];
+    if (typeof override === "string" && override.trim()) return override.trim();
+    return getThemePreviewImage(preset);
+  };
+  const setBuiltInPreviewImage = (key: LandingPageTheme, value: string) => {
+    updateSiteConfig({
+      theme_preview_images: {
+        ...themePreviewOverrides,
+        [key]: value,
+      },
+    });
+  };
+  const clearBuiltInPreviewImage = (key: LandingPageTheme) => {
+    const next = { ...themePreviewOverrides };
+    delete next[key];
+    updateSiteConfig({ theme_preview_images: next });
+  };
 
   const applyTheme = (key: string) => {
     const heroSection = sections.find((s) => s.type === "hero");
@@ -79,6 +104,7 @@ const ThemesManager = () => {
           name: json.name,
           description: json.description || "",
           preview_colors: json.preview_colors,
+          preview_image: typeof json.preview_image === "string" ? json.preview_image : "",
           overrides: json.overrides,
           isCustom: true,
           createdAt: new Date().toISOString(),
@@ -102,14 +128,14 @@ const ThemesManager = () => {
   };
 
   const exportTheme = (id: string) => {
-    let data: { name: string; description: string; preview_colors: string[]; overrides: Record<string, unknown> };
+    let data: { name: string; description: string; preview_colors: string[]; preview_image?: string; overrides: Record<string, unknown> };
     const builtIn = landingPageThemePresets[id as LandingPageTheme];
     if (builtIn) {
-      data = { name: builtIn.name, description: builtIn.description, preview_colors: builtIn.preview_colors, overrides: builtIn.overrides as Record<string, unknown> };
+      data = { name: builtIn.name, description: builtIn.description, preview_colors: builtIn.preview_colors, preview_image: builtIn.preview_image, overrides: builtIn.overrides as Record<string, unknown> };
     } else {
       const custom = customThemes.find(t => t.id === id);
       if (!custom) return;
-      data = { name: custom.name, description: custom.description, preview_colors: custom.preview_colors, overrides: custom.overrides as Record<string, unknown> };
+      data = { name: custom.name, description: custom.description, preview_colors: custom.preview_colors, preview_image: custom.preview_image, overrides: custom.overrides as Record<string, unknown> };
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -122,6 +148,18 @@ const ThemesManager = () => {
   };
 
   const isActive = (key: string) => theme.landing_page_theme === key;
+  const handleBuiltInPreviewFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const target = builtInPreviewTarget;
+    if (!file || !target) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setBuiltInPreviewImage(target, (ev.target?.result as string) || "");
+      setBuiltInPreviewTarget(null);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -137,13 +175,32 @@ const ThemesManager = () => {
 
       {/* Built-in themes */}
       <div>
+        <input
+          ref={builtInPreviewFileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleBuiltInPreviewFileUpload}
+        />
         <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Thèmes intégrés ({builtInKeys.length})</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {builtInKeys.map(key => {
             const preset = landingPageThemePresets[key];
             const active = isActive(key);
+            const builtInImage = getBuiltInPreviewImage(key, { preview_image: preset.preview_image, overrides: preset.overrides as Record<string, unknown> });
             return (
               <div key={key} className={`rounded-xl border-2 p-4 transition-all ${active ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-muted-foreground/30"}`}>
+                {builtInImage ? (
+                  <div className="mb-3 rounded-lg overflow-hidden border border-border h-28">
+                    <img
+                      src={builtInImage}
+                      alt={preset.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="mb-3 rounded-lg border border-border h-28" style={{ background: `linear-gradient(135deg, hsl(${preset.preview_colors[0]}) 0%, hsl(${preset.preview_colors[1]}) 55%, hsl(${preset.preview_colors[2]}) 100%)` }} />
+                )}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex gap-1.5">
                     {preset.preview_colors.map((c, i) => (
@@ -158,6 +215,31 @@ const ThemesManager = () => {
                 </div>
                 <p className="text-sm font-semibold text-foreground">{preset.name}</p>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{preset.description}</p>
+                <div className="mt-2 space-y-2">
+                  <Input
+                    value={themePreviewOverrides[key] || ""}
+                    onChange={(e) => setBuiltInPreviewImage(key, e.target.value)}
+                    placeholder="URL image preview (optionnel)"
+                    className="h-8 text-xs"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setBuiltInPreviewTarget(key);
+                        builtInPreviewFileRef.current?.click();
+                      }}
+                    >
+                      Upload image
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => clearBuiltInPreviewImage(key)}>
+                      Reset
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex gap-2 mt-3">
                   <Button variant={active ? "secondary" : "default"} size="sm" className="flex-1 text-xs" onClick={() => applyTheme(key)} disabled={active}>
                     {active ? "Appliqué" : "Appliquer"}
@@ -195,6 +277,17 @@ const ThemesManager = () => {
               const active = isActive(ct.id);
               return (
                 <div key={ct.id} className={`rounded-xl border-2 p-4 transition-all ${active ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-muted-foreground/30"}`}>
+                  {getThemePreviewImage({ preview_image: ct.preview_image, overrides: ct.overrides as Record<string, unknown> }) ? (
+                    <div className="mb-3 rounded-lg overflow-hidden border border-border h-28">
+                      <img
+                        src={getThemePreviewImage({ preview_image: ct.preview_image, overrides: ct.overrides as Record<string, unknown> })}
+                        alt={ct.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mb-3 rounded-lg border border-border h-28" style={{ background: `linear-gradient(135deg, hsl(${ct.preview_colors[0]}) 0%, hsl(${ct.preview_colors[1] || ct.preview_colors[0]}) 55%, hsl(${ct.preview_colors[2] || ct.preview_colors[0]}) 100%)` }} />
+                  )}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex gap-1.5">
                       {ct.preview_colors.map((c, i) => (
@@ -276,6 +369,15 @@ const ThemesManager = () => {
           ) : (
             <div className="space-y-4">
               <div className="rounded-xl border border-border p-4">
+                {getThemePreviewImage({ preview_image: previewData.preview_image, overrides: previewData.overrides as Record<string, unknown> }) && (
+                  <div className="mb-3 rounded-lg overflow-hidden border border-border h-28">
+                    <img
+                      src={getThemePreviewImage({ preview_image: previewData.preview_image, overrides: previewData.overrides as Record<string, unknown> })}
+                      alt={previewData.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 <div className="flex gap-1.5 mb-3">
                   {previewData.preview_colors.map((c, i) => (
                     <div key={i} className="w-8 h-8 rounded-full border border-border" style={{ background: `hsl(${c})` }} />
