@@ -156,6 +156,7 @@ export async function getAdminState(): Promise<AdminStatePayload> {
       logo_text: siteConfig.logoText,
       logo_image: siteConfig.logoImage,
       logo_display_mode: siteConfig.logoDisplayMode,
+      logo_size: siteConfig.logoSize,
       logo_tagline: asLocalized(siteConfig.logoTagline),
       hero_background_image: siteConfig.heroBackgroundImage,
       hero_side_image: siteConfig.heroSideImage,

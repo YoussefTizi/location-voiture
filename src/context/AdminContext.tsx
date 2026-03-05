@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import {
   Car, Booking, DashboardStats,
 } from "@/data/mock-database";
@@ -124,6 +124,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [adminDarkMode, setAdminDarkModeState] = useState<boolean>(() => {
     try { return localStorage.getItem("admin-dark-mode") === "true"; } catch { return true; }
   });
+  const sectionsPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSectionsRef = useRef<ExtendedSectionConfig[] | null>(null);
 
   const persistPatch = useCallback(async (patch: Record<string, unknown>) => {
     const res = await fetch("/api/admin/state", {
@@ -384,7 +386,11 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateSection = useCallback((id: string, data: Partial<ExtendedSectionConfig>) => {
     setSections(prev => {
       const next = prev.map(s => s.id === id ? { ...s, ...data } : s);
-      syncPatch({ sections: next });
+      pendingSectionsRef.current = next;
+      if (sectionsPersistTimerRef.current) clearTimeout(sectionsPersistTimerRef.current);
+      sectionsPersistTimerRef.current = setTimeout(() => {
+        if (pendingSectionsRef.current) syncPatch({ sections: pendingSectionsRef.current });
+      }, 350);
       return next;
     });
   }, [syncPatch]);
@@ -395,10 +401,18 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const [moved] = sorted.splice(fromIndex, 1);
       sorted.splice(toIndex, 0, moved);
       const next = sorted.map((s, i) => ({ ...s, order: i }));
+      if (sectionsPersistTimerRef.current) clearTimeout(sectionsPersistTimerRef.current);
+      pendingSectionsRef.current = null;
       syncPatch({ sections: next });
       return next;
     });
   }, [syncPatch]);
+
+  useEffect(() => {
+    return () => {
+      if (sectionsPersistTimerRef.current) clearTimeout(sectionsPersistTimerRef.current);
+    };
+  }, []);
 
   const updateSiteConfig = useCallback((data: Partial<SiteConfig>) => {
     setSiteConfig(prev => {

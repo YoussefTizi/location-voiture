@@ -251,6 +251,7 @@ model SiteConfig {
   logoText          String            @map("logo_text")
   logoImage         String            @default("") @map("logo_image")
   logoDisplayMode   LogoDisplayMode   @map("logo_display_mode")
+  logoSize          Int               @default(96) @map("logo_size")
   logoTagline       Json              @map("logo_tagline")
   heroBackgroundImage String          @map("hero_background_image")
   heroSideImage     String            @map("hero_side_image")

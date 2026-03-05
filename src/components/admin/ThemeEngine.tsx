@@ -73,7 +73,7 @@ const ColorPicker = ({ label, value, onChange }: { label: string; value: string;
 };
 
 const ThemeEngine = () => {
-  const { theme, updateTheme } = useAdmin();
+  const { theme, updateTheme, sections, updateSection } = useAdmin();
   const [radiusIndex, setRadiusIndex] = useState(() => {
     const idx = radiusValues.indexOf(theme.border_radius);
     return idx >= 0 ? idx : 2;
@@ -86,6 +86,19 @@ const ThemeEngine = () => {
   };
 
   const applyLandingTheme = (themeKey: LandingPageTheme) => {
+    const heroSection = sections.find((s) => s.type === "hero");
+    if (heroSection?.content?.trim()) {
+      try {
+        const parsed = JSON.parse(heroSection.content) as Record<string, unknown>;
+        if ("title_colors" in parsed) {
+          const { title_colors: _ignored, ...rest } = parsed;
+          updateSection(heroSection.id, { content: JSON.stringify(rest) });
+        }
+      } catch {
+        // keep existing content if invalid JSON
+      }
+    }
+
     const preset = landingPageThemePresets[themeKey];
     const fullPresetTheme: ExtendedThemeConfig = {
       ...initialExtendedTheme,
@@ -125,7 +138,7 @@ const ThemeEngine = () => {
             const preset = landingPageThemePresets[key];
             const isActive = theme.landing_page_theme === key;
             return (
-              <button key={key} onClick={() => applyLandingTheme(key)}
+              <div key={key}
                 className={`relative rounded-xl p-4 border-2 transition-all text-left ${isActive ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-muted-foreground/30"}`}>
                 {isActive && (
                   <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
@@ -139,7 +152,24 @@ const ThemeEngine = () => {
                 </div>
                 <p className="text-sm font-semibold text-foreground">{preset.name}</p>
                 <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">{preset.description}</p>
-              </button>
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyLandingTheme(key)}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                  >
+                    {isActive ? "Actif" : "Activer"}
+                  </button>
+                  <a
+                    href={`/preview/${key}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-foreground hover:bg-secondary transition-colors"
+                  >
+                    Preview
+                  </a>
+                </div>
+              </div>
             );
           })}
         </div>
