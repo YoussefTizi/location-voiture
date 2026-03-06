@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useAdmin } from "@/context/AdminContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -95,6 +95,8 @@ const formatCurrencyDisplay = (amount: number, currencyCode: string, fallbackSym
   const value = formatCurrencyAmount(amount, currencyCode);
   return rule.position === "suffix" ? `${value} ${token}` : `${token}${value}`;
 };
+
+type BookingFieldKey = "full_name" | "email" | "phone" | "pickup_date" | "return_date";
 
 const getCurrencyFlag = (code: string) => {
   const flags: Record<string, string> = {
@@ -615,7 +617,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   // ── SUNSET: Editorial asymmetric hero ──
   if (lp === "sunset") {
     return (
-      <section id="hero" className="relative min-h-screen flex items-end pb-20 pt-20" style={{ background: `linear-gradient(160deg, ${ts.heroBg} 40%, hsl(${theme.accent_color} / 0.15) 100%)`, fontFamily: theme.font_family }}>
+      <section id="hero" className="relative min-h-screen flex items-end pb-20 pt-28 sm:pt-20" style={{ background: `linear-gradient(160deg, ${ts.heroBg} 40%, hsl(${theme.accent_color} / 0.15) 100%)`, fontFamily: theme.font_family }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
             <div className="lg:col-span-7 space-y-6 animate-fade-in">
@@ -663,7 +665,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   // ── ARCTIC: Ultra-minimal centered hero with floating badge ──
   if (lp === "arctic") {
     return (
-      <section id="hero" className="relative min-h-screen flex items-center justify-center pt-20" style={{ background: `linear-gradient(180deg, ${ts.heroBg} 0%, hsl(${theme.background_color}) 100%)`, fontFamily: theme.font_family }}>
+      <section id="hero" className="relative min-h-screen flex items-center justify-center pt-28 sm:pt-20" style={{ background: `linear-gradient(180deg, ${ts.heroBg} 0%, hsl(${theme.background_color}) 100%)`, fontFamily: theme.font_family }}>
         <div className="max-w-4xl mx-auto px-4 text-center space-y-8 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold" style={{ background: `hsl(${theme.primary_color} / 0.08)`, color: ts.primaryHSL }}>
             <Sparkles size={14} /> {badgeText}
@@ -708,7 +710,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   // ── DESERT: Warm layered hero with offset image ──
   if (lp === "desert") {
     return (
-      <section id="hero" className="relative min-h-screen flex items-center pt-20" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
+      <section id="hero" className="relative min-h-screen flex items-center pt-28 sm:pt-20" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
         <div className="absolute inset-0 z-0" style={{ background: `radial-gradient(ellipse at 70% 50%, hsl(${theme.accent_color} / 0.12) 0%, transparent 70%)` }} />
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -766,7 +768,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   // Dark fullscreen themes (sporty, neon)
   if (ts.isDark) {
     return (
-      <section id="hero" className="relative min-h-screen flex items-center pt-20" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
+      <section id="hero" className="relative min-h-screen flex items-center pt-28 sm:pt-20" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
         <div className="absolute inset-0 z-0">
           {resolvedHeroBackgroundImage && (
             <img src={resolvedHeroBackgroundImage} alt="" className="w-full h-full object-cover opacity-30" />
@@ -819,7 +821,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   // Classic theme
   if (lp === "classic") {
     return (
-      <section id="hero" className="relative min-h-[90vh] flex items-center pt-20" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
+      <section id="hero" className="relative min-h-[90vh] flex items-center pt-28 sm:pt-20" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
           <div className={`grid grid-cols-1 lg:grid-cols-2 gap-12 items-center`}>
             {heroLeft && (
@@ -881,7 +883,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
     const ecoBgTop = shiftColor(`hsl(${theme.background_color})`, -0.01);
     const ecoBgBottom = shiftColor(`hsl(${theme.background_color})`, -0.06);
     return (
-      <section id="hero" className="relative min-h-[90vh] flex items-center pt-20" style={{ background: `linear-gradient(180deg, ${ecoBgTop} 0%, ${ecoBgBottom} 100%)`, fontFamily: theme.font_family }}>
+      <section id="hero" className="relative min-h-[90vh] flex items-center pt-28 sm:pt-20" style={{ background: `linear-gradient(180deg, ${ecoBgTop} 0%, ${ecoBgBottom} 100%)`, fontFamily: theme.font_family }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
           <div className="text-center max-w-3xl mx-auto space-y-8 animate-fade-in">
             <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold mx-auto" style={{ background: `hsl(${theme.primary_color} / 0.12)`, color: ts.primaryHSL }}>
@@ -1022,7 +1024,7 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   );
 
   return (
-    <section id="hero" className="relative min-h-[90vh] flex items-center pt-20" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
+    <section id="hero" className="relative min-h-[90vh] flex items-center pt-28 sm:pt-20" style={{ background: ts.heroBg, fontFamily: theme.font_family }}>
       {theme.hero_background_enabled && theme.hero_background_type === "pattern" && (
         <div className="absolute inset-0 z-0" style={getHeroBackgroundCSS(theme)} />
       )}
@@ -1322,7 +1324,9 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
   }>(null);
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingSubmitError, setBookingSubmitError] = useState("");
+  const [bookingViewportHeight, setBookingViewportHeight] = useState<number | null>(null);
   const [activeCategory, setActiveCategory] = useState("all");
+  const bookingInputRefs = useRef<Partial<Record<BookingFieldKey, HTMLInputElement | null>>>({});
   const { lt, t } = useLanguage();
   const { estimation, contact, bookingForm, createBooking } = useAdmin();
   const ts = getThemeStyles(theme);
@@ -1378,6 +1382,81 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
     color: modalInputText,
     ["--ds-input-placeholder-color" as any]: modalInputPlaceholder,
   } as React.CSSProperties;
+  const bookingFieldOrder = useMemo<BookingFieldKey[]>(() => {
+    const fields: BookingFieldKey[] = [];
+    if (bookingForm.show_name) fields.push("full_name");
+    if (bookingForm.show_email) fields.push("email");
+    if (bookingForm.show_phone) fields.push("phone");
+    if (bookingForm.show_pickup_date) fields.push("pickup_date");
+    if (bookingForm.show_return_date) fields.push("return_date");
+    return fields;
+  }, [
+    bookingForm.show_name,
+    bookingForm.show_email,
+    bookingForm.show_phone,
+    bookingForm.show_pickup_date,
+    bookingForm.show_return_date,
+  ]);
+
+  useEffect(() => {
+    if (!bookingCar || typeof window === "undefined") {
+      setBookingViewportHeight(null);
+      return;
+    }
+    const updateViewportHeight = () => {
+      const viewportHeight = Math.round(window.visualViewport?.height ?? window.innerHeight);
+      setBookingViewportHeight(viewportHeight);
+    };
+    updateViewportHeight();
+    window.visualViewport?.addEventListener("resize", updateViewportHeight);
+    window.addEventListener("resize", updateViewportHeight);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateViewportHeight);
+      window.removeEventListener("resize", updateViewportHeight);
+    };
+  }, [bookingCar]);
+
+  const setBookingInputRef = (field: BookingFieldKey) => (node: HTMLInputElement | null) => {
+    bookingInputRefs.current[field] = node;
+  };
+
+  const scrollBookingFieldIntoView = (field: BookingFieldKey) => {
+    const node = bookingInputRefs.current[field];
+    if (!node) return;
+    window.requestAnimationFrame(() => {
+      node.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  };
+
+  const handleBookingFieldFocus = (field: BookingFieldKey) => () => {
+    if (typeof window === "undefined") return;
+    scrollBookingFieldIntoView(field);
+  };
+
+  const focusNextBookingField = (field: BookingFieldKey) => {
+    const index = bookingFieldOrder.indexOf(field);
+    if (index < 0) return false;
+    const nextField = bookingFieldOrder[index + 1];
+    if (!nextField) return false;
+    const nextInput = bookingInputRefs.current[nextField];
+    if (!nextInput) return false;
+    nextInput.focus();
+    scrollBookingFieldIntoView(nextField);
+    return true;
+  };
+
+  const handleBookingFieldKeyDown = (field: BookingFieldKey) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+    const moved = focusNextBookingField(field);
+    if (moved) {
+      e.preventDefault();
+      return;
+    }
+    if (field === "return_date") return;
+    e.preventDefault();
+    e.currentTarget.form?.requestSubmit();
+  };
 
   const resetBookingModalState = () => {
     setBookingDraft({
@@ -1703,9 +1782,16 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
         }
       }}>
         <DialogContent
-          className="max-w-md rounded-2xl border shadow-2xl"
+          className="max-w-md rounded-2xl border shadow-2xl p-4 sm:p-6 max-h-[calc(var(--booking-vh,100dvh)-1rem)] sm:max-h-[min(92dvh,760px)] overflow-y-auto"
           overlayClassName="bg-slate-900/42 backdrop-blur-[1.5px]"
-          style={{ background: withAlpha(modalBg, 0.96), borderColor: cardBorderColor, color: textColor }}
+          style={{
+            background: withAlpha(modalBg, 0.96),
+            borderColor: cardBorderColor,
+            color: textColor,
+            scrollBehavior: "smooth",
+            WebkitOverflowScrolling: "touch",
+            ["--booking-vh" as string]: bookingViewportHeight ? `${bookingViewportHeight}px` : "100dvh",
+          } as React.CSSProperties}
         >
           {!bookingConfirmed ? (
             <>
@@ -1716,13 +1802,18 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
                 </DialogTitle>
                 <p className="text-sm" style={{ color: mutedColor }}>{t("reservation_form_hint")}</p>
               </DialogHeader>
-              <form className="space-y-3" onSubmit={submitBookingDraft} noValidate>
+              <form className="space-y-3 pb-2" onSubmit={submitBookingDraft} noValidate>
                 {bookingForm.show_name && (
                   <div>
                     <Label className="text-xs" style={{ color: modalLabelColor }}>{t("full_name")}</Label>
                     <Input
+                      ref={setBookingInputRef("full_name")}
                       value={bookingDraft.full_name}
                       onChange={(e) => setBookingDraft(prev => ({ ...prev, full_name: e.target.value }))}
+                      onKeyDown={handleBookingFieldKeyDown("full_name")}
+                      onFocus={handleBookingFieldFocus("full_name")}
+                      autoComplete="name"
+                      enterKeyHint="next"
                       className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
                       style={modalInputStyle}
                     />
@@ -1733,9 +1824,15 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
                   <div>
                     <Label className="text-xs" style={{ color: modalLabelColor }}>{t("email")}</Label>
                     <Input
+                      ref={setBookingInputRef("email")}
                       type="email"
                       value={bookingDraft.email}
                       onChange={(e) => setBookingDraft(prev => ({ ...prev, email: e.target.value }))}
+                      onKeyDown={handleBookingFieldKeyDown("email")}
+                      onFocus={handleBookingFieldFocus("email")}
+                      autoComplete="email"
+                      inputMode="email"
+                      enterKeyHint="next"
                       className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
                       style={modalInputStyle}
                     />
@@ -1746,22 +1843,32 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
                   <div>
                     <Label className="text-xs" style={{ color: modalLabelColor }}>{t("phone")}</Label>
                     <Input
+                      ref={setBookingInputRef("phone")}
                       value={bookingDraft.phone}
                       onChange={(e) => setBookingDraft(prev => ({ ...prev, phone: e.target.value }))}
+                      onKeyDown={handleBookingFieldKeyDown("phone")}
+                      onFocus={handleBookingFieldFocus("phone")}
+                      autoComplete="tel"
+                      inputMode="tel"
+                      enterKeyHint="next"
                       className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
                       style={modalInputStyle}
                     />
                     {bookingErrors.phone && <p className="mt-1 text-[11px] text-red-500">{bookingErrors.phone}</p>}
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {bookingForm.show_pickup_date && (
                     <div>
                       <Label className="text-xs" style={{ color: modalLabelColor }}>{t("pickup_date")}</Label>
                       <Input
+                        ref={setBookingInputRef("pickup_date")}
                         type="date"
                         value={bookingDraft.pickup_date}
                         onChange={(e) => setBookingDraft(prev => ({ ...prev, pickup_date: e.target.value }))}
+                        onKeyDown={handleBookingFieldKeyDown("pickup_date")}
+                        onFocus={handleBookingFieldFocus("pickup_date")}
+                        enterKeyHint="next"
                         className={`mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)] ${isDarkSurface(modalInputBg) ? "[color-scheme:dark]" : "[color-scheme:light]"}`}
                         style={modalInputStyle}
                       />
@@ -1772,9 +1879,13 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
                     <div>
                       <Label className="text-xs" style={{ color: modalLabelColor }}>{t("return_date")}</Label>
                       <Input
+                        ref={setBookingInputRef("return_date")}
                         type="date"
                         value={bookingDraft.return_date}
                         onChange={(e) => setBookingDraft(prev => ({ ...prev, return_date: e.target.value }))}
+                        onKeyDown={handleBookingFieldKeyDown("return_date")}
+                        onFocus={handleBookingFieldFocus("return_date")}
+                        enterKeyHint="done"
                         className={`mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)] ${isDarkSurface(modalInputBg) ? "[color-scheme:dark]" : "[color-scheme:light]"}`}
                         style={modalInputStyle}
                       />
