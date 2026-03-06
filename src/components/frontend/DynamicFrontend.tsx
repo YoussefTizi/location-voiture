@@ -3635,8 +3635,9 @@ const sectionMap: Record<string, React.FC<any>> = {
 const DynamicFrontend = () => {
   const pathname = usePathname();
   const { sections, theme, cars, seo, stateReady, customThemes } = useAdmin();
+  const isPreviewRoute = pathname.startsWith("/preview/");
   const previewTheme = useMemo(() => {
-    if (!pathname.startsWith("/preview/")) return null;
+    if (!isPreviewRoute) return null;
 
     const slug = pathname.split("/").filter(Boolean)[1] || "";
     const presetKeys = Object.keys(landingPageThemePresets) as LandingPageTheme[];
@@ -3674,21 +3675,24 @@ const DynamicFrontend = () => {
       footer_background_color: customTheme.overrides.footer_background_color ?? customTheme.overrides.secondary_color ?? initialExtendedTheme.footer_background_color,
       footer_text_color: customTheme.overrides.footer_text_color ?? customTheme.overrides.text_color ?? initialExtendedTheme.footer_text_color,
     } as ExtendedThemeConfig;
-  }, [pathname, customThemes]);
+  }, [pathname, customThemes, isPreviewRoute]);
   const effectiveTheme = previewTheme ?? theme;
   const { lt, lang, isRTL } = useLanguage();
   const ts = getThemeStyles(effectiveTheme);
   const rootBg = `hsl(${effectiveTheme.background_color})`;
   const rootText = ensureReadableAccent(`hsl(${effectiveTheme.text_color})`, rootBg, 4.5) || ts.heroText;
   const enabled = [...sections].filter(s => s.enabled).sort((a, b) => a.order - b.order);
+  const shouldRenderContent = stateReady || isPreviewRoute;
 
   useEffect(() => {
+    if (!shouldRenderContent) return;
     document.title = lt(seo.title);
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) metaDesc.setAttribute("content", lt(seo.description));
-  }, [seo, lang, lt]);
+  }, [seo, lang, lt, shouldRenderContent]);
 
   useEffect(() => {
+    if (!shouldRenderContent) return;
     const htmlEl = document.documentElement;
     const bodyEl = document.body;
     const prevHtmlBg = htmlEl.style.backgroundColor;
@@ -3710,7 +3714,11 @@ const DynamicFrontend = () => {
       bodyEl.style.backgroundColor = prevBodyBg;
       bodyEl.style.color = prevBodyColor;
     };
-  }, [effectiveTheme.background_color, effectiveTheme.text_color, rootBg, rootText]);
+  }, [effectiveTheme.background_color, effectiveTheme.text_color, rootBg, rootText, shouldRenderContent]);
+
+  if (!shouldRenderContent) {
+    return <div style={{ minHeight: "100vh", background: "hsl(210 40% 98%)" }} aria-hidden="true" />;
+  }
 
   return (
     <div style={{ minHeight: "100vh", fontFamily: effectiveTheme.font_family, background: rootBg, color: rootText }} dir={isRTL ? "rtl" : "ltr"}>
