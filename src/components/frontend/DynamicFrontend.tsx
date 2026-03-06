@@ -2646,6 +2646,7 @@ const CitiesSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
 const TestimonialsSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: ExtendedThemeConfig }) => {
   const { testimonials } = useAdmin();
   const { lt } = useLanguage();
+  const [classicActiveIdx, setClassicActiveIdx] = useState(0);
   const ts = getThemeStyles(theme);
   const lp = theme.landing_page_theme;
   const isFlat = theme.flat_design;
@@ -2737,8 +2738,7 @@ const TestimonialsSection = ({ config, theme }: { config: ExtendedSectionConfig;
 
   // ── CLASSIC: Single featured quote with side navigation ──
   if (lp === "classic") {
-    const [activeIdx, setActiveIdx] = useState(0);
-    const active = testimonials[activeIdx] || testimonials[0];
+    const active = testimonials[classicActiveIdx] || testimonials[0];
     return (
       <section id="testimonials" className="py-20 px-5" style={{ background: bgColor, fontFamily: theme.font_family }}>
         <div className="max-w-4xl mx-auto">
@@ -2748,9 +2748,9 @@ const TestimonialsSection = ({ config, theme }: { config: ExtendedSectionConfig;
               <h2 className="text-3xl font-bold mb-6" style={{ fontFamily: theme.heading_font, color: textColor }}>{lt(config.title)}</h2>
               <div className="space-y-2">
                 {testimonials.map((t, i) => (
-                  <button key={t.id} onClick={() => setActiveIdx(i)}
+                  <button key={t.id} onClick={() => setClassicActiveIdx(i)}
                     className="w-full text-left px-4 py-3 rounded-xl text-sm transition-all"
-                    style={{ background: activeIdx === i ? `hsl(${theme.primary_color} / 0.08)` : "transparent", color: activeIdx === i ? ts.primaryHSL : mutedColor, fontWeight: activeIdx === i ? 700 : 400 }}>
+                    style={{ background: classicActiveIdx === i ? `hsl(${theme.primary_color} / 0.08)` : "transparent", color: classicActiveIdx === i ? ts.primaryHSL : mutedColor, fontWeight: classicActiveIdx === i ? 700 : 400 }}>
                     {t.name}
                   </button>
                 ))}
@@ -3283,6 +3283,13 @@ const FooterSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
   const { siteConfig, contact, navItems } = useAdmin();
   const { lt, t } = useLanguage();
   const menuNav = navItems.filter(n => n.enabled && n.show_in_menu);
+  const siteName = siteConfig.logo_text?.trim() || theme.site_name?.trim() || "Website";
+  const footerCopyright = useMemo(() => {
+    const raw = (siteConfig.copyright || "").trim();
+    const defaultCopyright = `© ${new Date().getFullYear()} ${siteName}`;
+    if (!raw) return defaultCopyright;
+    return raw.replaceAll("DriveStyle Studio", siteName).replaceAll("RentFlow", siteName);
+  }, [siteConfig.copyright, siteName]);
   const ts = getThemeStyles(theme);
   const lp = theme.landing_page_theme;
   const footerText = ensureReadableAccent(`hsl(${theme.footer_text_color || theme.text_color})`, ts.footerBg, 3) || `hsl(${theme.footer_text_color || theme.text_color})`;
@@ -3325,7 +3332,7 @@ const FooterSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
             ))}
           </div>
         </div>
-        <p className="text-center text-[10px] mt-6" style={{ color: footerFaint }}>{siteConfig.copyright}</p>
+        <p className="text-center text-[10px] mt-6" style={{ color: footerFaint }}>{footerCopyright}</p>
       </footer>
     );
   }
@@ -3364,7 +3371,7 @@ const FooterSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
             </div>
           </div>
           <div className="border-t pt-6" style={{ borderColor: footerBorder }}>
-            <p className="text-xs text-center" style={{ color: footerFaint }}>{siteConfig.copyright} · {t("all_rights_reserved")}</p>
+            <p className="text-xs text-center" style={{ color: footerFaint }}>{footerCopyright} · {t("all_rights_reserved")}</p>
           </div>
         </div>
       </footer>
@@ -3388,7 +3395,7 @@ const FooterSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
               </a>
             ))}
           </div>
-          <p className="text-[10px]" style={{ color: footerFaint }}>{siteConfig.copyright} · {t("all_rights_reserved")}</p>
+          <p className="text-[10px]" style={{ color: footerFaint }}>{footerCopyright} · {t("all_rights_reserved")}</p>
         </div>
       </footer>
     );
@@ -3433,7 +3440,7 @@ const FooterSection = ({ config, theme }: { config: ExtendedSectionConfig; theme
           </div>
         </div>
         <div className="border-t mt-8 pt-6" style={{ borderColor: footerBorder }}>
-          <p className="text-xs text-center" style={{ color: footerFaint }}>{siteConfig.copyright} · {t("all_rights_reserved")}</p>
+          <p className="text-xs text-center" style={{ color: footerFaint }}>{footerCopyright} · {t("all_rights_reserved")}</p>
         </div>
       </div>
     </footer>
@@ -3676,14 +3683,12 @@ const DynamicFrontend = () => {
   const enabled = [...sections].filter(s => s.enabled).sort((a, b) => a.order - b.order);
 
   useEffect(() => {
-    if (!stateReady) return;
     document.title = lt(seo.title);
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) metaDesc.setAttribute("content", lt(seo.description));
-  }, [seo, lang, lt, stateReady]);
+  }, [seo, lang, lt]);
 
   useEffect(() => {
-    if (!stateReady) return;
     const htmlEl = document.documentElement;
     const bodyEl = document.body;
     const prevHtmlBg = htmlEl.style.backgroundColor;
@@ -3705,9 +3710,7 @@ const DynamicFrontend = () => {
       bodyEl.style.backgroundColor = prevBodyBg;
       bodyEl.style.color = prevBodyColor;
     };
-  }, [effectiveTheme.background_color, effectiveTheme.text_color, rootBg, rootText, stateReady]);
-
-  if (!stateReady) return null;
+  }, [effectiveTheme.background_color, effectiveTheme.text_color, rootBg, rootText]);
 
   return (
     <div style={{ minHeight: "100vh", fontFamily: effectiveTheme.font_family, background: rootBg, color: rootText }} dir={isRTL ? "rtl" : "ltr"}>
