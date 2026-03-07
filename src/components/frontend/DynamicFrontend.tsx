@@ -3743,6 +3743,23 @@ const sectionMap: Record<string, React.FC<any>> = {
   footer: FooterSection,
 };
 
+const FrontendBootLoader = () => (
+  <div className="min-h-screen bg-background">
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12">
+      <div className="h-10 w-36 animate-pulse rounded-md bg-muted" />
+      <div className="mt-10 space-y-4">
+        <div className="h-7 w-72 max-w-full animate-pulse rounded-md bg-muted" />
+        <div className="h-5 w-96 max-w-full animate-pulse rounded-md bg-muted" />
+      </div>
+      <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="h-48 animate-pulse rounded-2xl bg-muted" />
+        <div className="h-48 animate-pulse rounded-2xl bg-muted" />
+        <div className="h-48 animate-pulse rounded-2xl bg-muted" />
+      </div>
+    </div>
+  </div>
+);
+
 const DynamicFrontend = () => {
   const pathname = usePathname();
   const { sections, theme, cars, seo, stateReady, customThemes } = useAdmin();
@@ -3828,7 +3845,7 @@ const DynamicFrontend = () => {
   }, [effectiveTheme.background_color, effectiveTheme.text_color, rootBg, rootText, shouldRenderContent]);
 
   if (!shouldRenderContent) {
-    return <div style={{ minHeight: "100vh", background: "hsl(210 40% 98%)" }} aria-hidden="true" />;
+    return <FrontendBootLoader />;
   }
 
   return (
