@@ -1423,9 +1423,11 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
   const scrollBookingFieldIntoView = (field: BookingFieldKey) => {
     const node = bookingInputRefs.current[field];
     if (!node) return;
-    window.requestAnimationFrame(() => {
-      node.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
+    const scrollToField = () => {
+      node.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    };
+    window.requestAnimationFrame(scrollToField);
+    window.setTimeout(scrollToField, 180);
   };
 
   const handleBookingFieldFocus = (field: BookingFieldKey) => () => {
@@ -1782,7 +1784,7 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
         }
       }}>
         <DialogContent
-          className="max-w-md rounded-2xl border shadow-2xl p-4 sm:p-6 max-h-[calc(var(--booking-vh,100dvh)-1rem)] sm:max-h-[min(92dvh,760px)] overflow-y-auto"
+          className="w-[calc(100%-1rem)] max-w-md rounded-2xl border shadow-2xl p-4 sm:p-6 top-[max(0.5rem,env(safe-area-inset-top))] -translate-y-0 sm:top-[50%] sm:-translate-y-[50%] max-h-[calc(var(--booking-vh,100dvh)-max(1rem,env(safe-area-inset-top))-max(1rem,env(safe-area-inset-bottom)))] sm:max-h-[min(92dvh,760px)] overflow-y-auto"
           overlayClassName="bg-slate-900/42 backdrop-blur-[1.5px]"
           style={{
             background: withAlpha(modalBg, 0.96),
@@ -1790,6 +1792,8 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
             color: textColor,
             scrollBehavior: "smooth",
             WebkitOverflowScrolling: "touch",
+            scrollPaddingTop: "4.5rem",
+            scrollPaddingBottom: "8rem",
             ["--booking-vh" as string]: bookingViewportHeight ? `${bookingViewportHeight}px` : "100dvh",
           } as React.CSSProperties}
         >
@@ -2000,6 +2004,8 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
   }>(null);
   const [reservationSubmitting, setReservationSubmitting] = useState(false);
   const [reservationSubmitError, setReservationSubmitError] = useState("");
+  const [reservationViewportHeight, setReservationViewportHeight] = useState<number | null>(null);
+  const reservationInputRefs = useRef<Partial<Record<BookingFieldKey, HTMLInputElement | null>>>({});
 
   const availableCars = cars.filter(c => c.availability_status === "available");
   const tier = estimation.pricing_tiers.find(t => t.id === selectedTier);
@@ -2115,6 +2121,77 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
     insuranceModalRaw.button_label,
     lang === "fr" ? "Assurance & caution" : lang === "ar" ? "التأمين والوديعة" : "Insurance & deposit",
   );
+  const reservationFieldOrder = useMemo<BookingFieldKey[]>(() => {
+    const fields: BookingFieldKey[] = [];
+    if (bookingForm.show_name) fields.push("full_name");
+    if (bookingForm.show_email) fields.push("email");
+    if (bookingForm.show_phone) fields.push("phone");
+    if (bookingForm.show_pickup_date) fields.push("pickup_date");
+    if (bookingForm.show_return_date) fields.push("return_date");
+    return fields;
+  }, [
+    bookingForm.show_name,
+    bookingForm.show_email,
+    bookingForm.show_phone,
+    bookingForm.show_pickup_date,
+    bookingForm.show_return_date,
+  ]);
+  useEffect(() => {
+    if (!reservationModalOpen || typeof window === "undefined") {
+      setReservationViewportHeight(null);
+      return;
+    }
+    const updateViewportHeight = () => {
+      const viewportHeight = Math.round(window.visualViewport?.height ?? window.innerHeight);
+      setReservationViewportHeight(viewportHeight);
+    };
+    updateViewportHeight();
+    window.visualViewport?.addEventListener("resize", updateViewportHeight);
+    window.addEventListener("resize", updateViewportHeight);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateViewportHeight);
+      window.removeEventListener("resize", updateViewportHeight);
+    };
+  }, [reservationModalOpen]);
+  const setReservationInputRef = (field: BookingFieldKey) => (node: HTMLInputElement | null) => {
+    reservationInputRefs.current[field] = node;
+  };
+  const scrollReservationFieldIntoView = (field: BookingFieldKey) => {
+    const node = reservationInputRefs.current[field];
+    if (!node) return;
+    const scrollToField = () => {
+      node.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    };
+    window.requestAnimationFrame(scrollToField);
+    window.setTimeout(scrollToField, 180);
+  };
+  const handleReservationFieldFocus = (field: BookingFieldKey) => () => {
+    if (typeof window === "undefined") return;
+    scrollReservationFieldIntoView(field);
+  };
+  const focusNextReservationField = (field: BookingFieldKey) => {
+    const index = reservationFieldOrder.indexOf(field);
+    if (index < 0) return false;
+    const nextField = reservationFieldOrder[index + 1];
+    if (!nextField) return false;
+    const nextInput = reservationInputRefs.current[nextField];
+    if (!nextInput) return false;
+    nextInput.focus();
+    scrollReservationFieldIntoView(nextField);
+    return true;
+  };
+  const handleReservationFieldKeyDown = (field: BookingFieldKey) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+    const moved = focusNextReservationField(field);
+    if (moved) {
+      e.preventDefault();
+      return;
+    }
+    if (field === "return_date") return;
+    e.preventDefault();
+    e.currentTarget.form?.requestSubmit();
+  };
   const openReservationModal = () => {
     if (!car) return;
     const pickupDate = desiredDate || "";
@@ -2413,9 +2490,18 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
         }}
       >
         <DialogContent
-          className="max-w-md rounded-2xl border shadow-2xl"
+          className="w-[calc(100%-1rem)] max-w-md rounded-2xl border shadow-2xl p-4 sm:p-6 top-[max(0.5rem,env(safe-area-inset-top))] -translate-y-0 sm:top-[50%] sm:-translate-y-[50%] max-h-[calc(var(--reservation-vh,100dvh)-max(1rem,env(safe-area-inset-top))-max(1rem,env(safe-area-inset-bottom)))] sm:max-h-[min(92dvh,760px)] overflow-y-auto"
           overlayClassName="bg-slate-900/42 backdrop-blur-[1.5px]"
-          style={{ background: withAlpha(formBg, 0.96), borderColor: formBorder, color: textColor }}
+          style={{
+            background: withAlpha(formBg, 0.96),
+            borderColor: formBorder,
+            color: textColor,
+            scrollBehavior: "smooth",
+            WebkitOverflowScrolling: "touch",
+            scrollPaddingTop: "4.5rem",
+            scrollPaddingBottom: "8rem",
+            ["--reservation-vh" as string]: reservationViewportHeight ? `${reservationViewportHeight}px` : "100dvh",
+          } as React.CSSProperties}
         >
           {!reservationConfirmed ? (
             <>
@@ -2426,13 +2512,18 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
                 </DialogTitle>
                 <p className="text-sm" style={{ color: mutedColor }}>{t("reservation_form_hint")}</p>
               </DialogHeader>
-              <form className="space-y-3" onSubmit={submitReservationDraft} noValidate>
+              <form className="space-y-3 pb-2" onSubmit={submitReservationDraft} noValidate>
                 {bookingForm.show_name && (
                   <div>
                     <Label className="text-xs" style={{ color: formLabelColor }}>{t("full_name")}</Label>
                     <Input
+                      ref={setReservationInputRef("full_name")}
                       value={reservationDraft.full_name}
                       onChange={(e) => setReservationDraft(prev => ({ ...prev, full_name: e.target.value }))}
+                      onKeyDown={handleReservationFieldKeyDown("full_name")}
+                      onFocus={handleReservationFieldFocus("full_name")}
+                      autoComplete="name"
+                      enterKeyHint="next"
                       className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
                       style={modalInputStyle}
                     />
@@ -2443,9 +2534,15 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
                   <div>
                     <Label className="text-xs" style={{ color: formLabelColor }}>{t("email")}</Label>
                     <Input
+                      ref={setReservationInputRef("email")}
                       type="email"
                       value={reservationDraft.email}
                       onChange={(e) => setReservationDraft(prev => ({ ...prev, email: e.target.value }))}
+                      onKeyDown={handleReservationFieldKeyDown("email")}
+                      onFocus={handleReservationFieldFocus("email")}
+                      autoComplete="email"
+                      inputMode="email"
+                      enterKeyHint="next"
                       className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
                       style={modalInputStyle}
                     />
@@ -2456,22 +2553,32 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
                   <div>
                     <Label className="text-xs" style={{ color: formLabelColor }}>{t("phone")}</Label>
                     <Input
+                      ref={setReservationInputRef("phone")}
                       value={reservationDraft.phone}
                       onChange={(e) => setReservationDraft(prev => ({ ...prev, phone: e.target.value }))}
+                      onKeyDown={handleReservationFieldKeyDown("phone")}
+                      onFocus={handleReservationFieldFocus("phone")}
+                      autoComplete="tel"
+                      inputMode="tel"
+                      enterKeyHint="next"
                       className="mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)]"
                       style={modalInputStyle}
                     />
                     {reservationErrors.phone && <p className="mt-1 text-[11px] text-red-500">{reservationErrors.phone}</p>}
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {bookingForm.show_pickup_date && (
                     <div>
                       <Label className="text-xs" style={{ color: formLabelColor }}>{t("pickup_date")}</Label>
                       <Input
+                        ref={setReservationInputRef("pickup_date")}
                         type="date"
                         value={reservationDraft.pickup_date}
                         onChange={(e) => setReservationDraft(prev => ({ ...prev, pickup_date: e.target.value }))}
+                        onKeyDown={handleReservationFieldKeyDown("pickup_date")}
+                        onFocus={handleReservationFieldFocus("pickup_date")}
+                        enterKeyHint="next"
                         className={`mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)] ${isDarkSurface(formInputBg) ? "[color-scheme:dark]" : "[color-scheme:light]"}`}
                         style={modalInputStyle}
                       />
@@ -2482,9 +2589,13 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
                     <div>
                       <Label className="text-xs" style={{ color: formLabelColor }}>{t("return_date")}</Label>
                       <Input
+                        ref={setReservationInputRef("return_date")}
                         type="date"
                         value={reservationDraft.return_date}
                         onChange={(e) => setReservationDraft(prev => ({ ...prev, return_date: e.target.value }))}
+                        onKeyDown={handleReservationFieldKeyDown("return_date")}
+                        onFocus={handleReservationFieldFocus("return_date")}
+                        enterKeyHint="done"
                         className={`mt-1 placeholder:opacity-100 placeholder:text-[var(--ds-input-placeholder-color)] ${isDarkSurface(formInputBg) ? "[color-scheme:dark]" : "[color-scheme:light]"}`}
                         style={modalInputStyle}
                       />
@@ -3763,6 +3874,7 @@ const FrontendBootLoader = () => (
 const DynamicFrontend = () => {
   const pathname = usePathname();
   const { sections, theme, cars, seo, stateReady, customThemes } = useAdmin();
+  const [bootTimeoutReached, setBootTimeoutReached] = useState(false);
   const isPreviewRoute = pathname.startsWith("/preview/");
   const previewTheme = useMemo(() => {
     if (!isPreviewRoute) return null;
@@ -3810,7 +3922,20 @@ const DynamicFrontend = () => {
   const rootBg = `hsl(${effectiveTheme.background_color})`;
   const rootText = ensureReadableAccent(`hsl(${effectiveTheme.text_color})`, rootBg, 4.5) || ts.heroText;
   const enabled = [...sections].filter(s => s.enabled).sort((a, b) => a.order - b.order);
-  const shouldRenderContent = stateReady || isPreviewRoute;
+  const shouldRenderContent = stateReady || isPreviewRoute || bootTimeoutReached;
+
+  useEffect(() => {
+    if (stateReady || isPreviewRoute) {
+      setBootTimeoutReached(false);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setBootTimeoutReached(true);
+    }, 8000);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [stateReady, isPreviewRoute]);
 
   useEffect(() => {
     if (!shouldRenderContent) return;

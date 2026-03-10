@@ -36,7 +36,21 @@ export type AdminStatePayload = {
 
 const asLocalized = (value: unknown) => value as { fr: string; en: string; ar: string };
 
-export async function getAdminState(): Promise<AdminStatePayload> {
+type GetAdminStateOptions = {
+  includeThemePreviewImages?: boolean;
+};
+
+const sanitizeThemePreviewImages = (input: Record<string, string>) =>
+  Object.fromEntries(
+    Object.entries(input).map(([key, value]) => {
+      if (typeof value !== "string") return [key, ""];
+      if (value.startsWith("data:")) return [key, ""];
+      return [key, value];
+    }),
+  );
+
+export async function getAdminState(options?: GetAdminStateOptions): Promise<AdminStatePayload> {
+  const includeThemePreviewImages = options?.includeThemePreviewImages ?? true;
   await prisma.$transaction(async (tx) => {
     await ensureAdminStateInitialized(tx);
   });
@@ -106,6 +120,11 @@ export async function getAdminState(): Promise<AdminStatePayload> {
     throw new Error("Missing required singleton configuration in database");
   }
 
+  const rawThemePreviewImages = (siteConfig.themePreviewImages as Record<string, string>) ?? {};
+  const responseThemePreviewImages = includeThemePreviewImages
+    ? rawThemePreviewImages
+    : sanitizeThemePreviewImages(rawThemePreviewImages);
+
   return {
     cars: mappedCars,
     bookings: mappedBookings,
@@ -158,7 +177,7 @@ export async function getAdminState(): Promise<AdminStatePayload> {
       logo_display_mode: siteConfig.logoDisplayMode,
       logo_size: siteConfig.logoSize,
       logo_tagline: asLocalized(siteConfig.logoTagline),
-      theme_preview_images: (siteConfig.themePreviewImages as Record<string, string>) ?? {},
+      theme_preview_images: responseThemePreviewImages,
       hero_background_image: siteConfig.heroBackgroundImage,
       hero_side_image: siteConfig.heroSideImage,
       hero_side_image_mode: siteConfig.heroSideImageMode,

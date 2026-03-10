@@ -3,9 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getAdminState } from "@/lib/server/admin-state";
 import { ensureAdminStateInitialized } from "@/lib/server/ensure-admin-state";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const state = await getAdminState();
+    const full = req.nextUrl.searchParams.get("full") === "1";
+    const state = await getAdminState({ includeThemePreviewImages: full });
     return NextResponse.json(state);
   } catch (error) {
     return NextResponse.json(

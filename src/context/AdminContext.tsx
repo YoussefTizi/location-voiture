@@ -142,7 +142,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const loadRemoteState = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/state", { method: "GET" });
+      const isAdminRoute = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+      const stateUrl = isAdminRoute ? "/api/admin/state?full=1" : "/api/admin/state";
+      const res = await fetch(stateUrl, { method: "GET" });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
         const error = typeof payload?.error === "string" ? payload.error : "Failed to load admin state";
