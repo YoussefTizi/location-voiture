@@ -15,6 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     customer_name: booking.customerName,
     phone: booking.phone,
     email: booking.email,
+    created_at: booking.createdAt.toISOString(),
     pickup_date: booking.pickupDate.toISOString().slice(0, 10),
     return_date: booking.returnDate.toISOString().slice(0, 10),
     car_id: booking.carId,

@@ -19,6 +19,7 @@ export interface Booking {
   customer_name: string;
   phone: string;
   email: string;
+  created_at: string;
   pickup_date: string;
   return_date: string;
   car_id: string;
@@ -142,11 +143,11 @@ export const initialCars: Car[] = [
 ];
 
 export const initialBookings: Booking[] = [
-  { booking_id: "BK-001", customer_name: "Youssef Amrani", phone: "+212 6 00 11 22 33", email: "youssef@email.com", pickup_date: "2026-03-01", return_date: "2026-03-05", car_id: "car-1", status: "confirmed", price_per_day_snapshot: 450, total_amount_snapshot: 1800, currency_code: "MAD" },
-  { booking_id: "BK-002", customer_name: "Sofia Martinez", phone: "+212 6 00 44 55 66", email: "sofia@email.com", pickup_date: "2026-03-03", return_date: "2026-03-10", car_id: "car-2", status: "pending", price_per_day_snapshot: 650, total_amount_snapshot: 4550, currency_code: "MAD" },
-  { booking_id: "BK-003", customer_name: "Ahmed Benali", phone: "+212 6 00 77 88 99", email: "ahmed@email.com", pickup_date: "2026-02-25", return_date: "2026-03-02", car_id: "car-3", status: "confirmed", price_per_day_snapshot: 380, total_amount_snapshot: 1900, currency_code: "MAD" },
-  { booking_id: "BK-004", customer_name: "Marie Dubois", phone: "+212 6 00 12 34 56", email: "marie@email.com", pickup_date: "2026-03-08", return_date: "2026-03-12", car_id: "car-5", status: "pending", price_per_day_snapshot: 1200, total_amount_snapshot: 4800, currency_code: "MAD" },
-  { booking_id: "BK-005", customer_name: "Karim El Fassi", phone: "+212 6 00 65 43 21", email: "karim@email.com", pickup_date: "2026-02-20", return_date: "2026-02-23", car_id: "car-4", status: "cancelled", price_per_day_snapshot: 500, total_amount_snapshot: 1500, currency_code: "MAD" },
+  { booking_id: "BK-001", customer_name: "Youssef Amrani", phone: "+212 6 00 11 22 33", email: "youssef@email.com", created_at: "2026-02-28T09:15:00.000Z", pickup_date: "2026-03-01", return_date: "2026-03-05", car_id: "car-1", status: "confirmed", price_per_day_snapshot: 450, total_amount_snapshot: 1800, currency_code: "MAD" },
+  { booking_id: "BK-002", customer_name: "Sofia Martinez", phone: "+212 6 00 44 55 66", email: "sofia@email.com", created_at: "2026-03-02T16:40:00.000Z", pickup_date: "2026-03-03", return_date: "2026-03-10", car_id: "car-2", status: "pending", price_per_day_snapshot: 650, total_amount_snapshot: 4550, currency_code: "MAD" },
+  { booking_id: "BK-003", customer_name: "Ahmed Benali", phone: "+212 6 00 77 88 99", email: "ahmed@email.com", created_at: "2026-02-24T11:05:00.000Z", pickup_date: "2026-02-25", return_date: "2026-03-02", car_id: "car-3", status: "confirmed", price_per_day_snapshot: 380, total_amount_snapshot: 1900, currency_code: "MAD" },
+  { booking_id: "BK-004", customer_name: "Marie Dubois", phone: "+212 6 00 12 34 56", email: "marie@email.com", created_at: "2026-03-07T20:20:00.000Z", pickup_date: "2026-03-08", return_date: "2026-03-12", car_id: "car-5", status: "pending", price_per_day_snapshot: 1200, total_amount_snapshot: 4800, currency_code: "MAD" },
+  { booking_id: "BK-005", customer_name: "Karim El Fassi", phone: "+212 6 00 65 43 21", email: "karim@email.com", created_at: "2026-02-19T08:00:00.000Z", pickup_date: "2026-02-20", return_date: "2026-02-23", car_id: "car-4", status: "cancelled", price_per_day_snapshot: 500, total_amount_snapshot: 1500, currency_code: "MAD" },
 ];
 
 export const initialSections: SectionConfig[] = [

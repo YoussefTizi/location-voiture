@@ -383,7 +383,7 @@ export const initialEstimationConfig: EstimationConfig = {
   night_delivery_fee: 200,
   currency: "MAD",
   currency_symbol: "DH",
-  whatsapp_message_template: "Bonjour, je souhaite réserver :\n🚗 Véhicule : {vehicle}\n📅 Durée : {duration} jours\n💰 Prix estimé : {total} {currency}\n📍 Ville : {city}\n📆 Date souhaitée : {date}\n\nMerci de confirmer la disponibilité.",
+  whatsapp_message_template: "Bonjour, je souhaite réserver :\nRéférence : {reference}\nVéhicule : {vehicle}\nDurée : {duration} jours\nPrix estimé : {total} {currency}\nVille : {city}\nDate souhaitée : {date}\n\nMerci de confirmer la disponibilité.",
   pricing_tiers: [
     { id: "tier-1", label: { fr: "3–7 jours", en: "3–7 days", ar: "3–7 أيام" }, duration_label: "3-7", min_days: 3, max_days: 7, discount_percent: 0 },
     { id: "tier-2", label: { fr: "8–14 jours", en: "8–14 days", ar: "8–14 أيام" }, duration_label: "8-14", min_days: 8, max_days: 14, discount_percent: 10 },

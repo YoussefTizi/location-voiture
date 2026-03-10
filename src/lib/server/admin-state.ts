@@ -57,7 +57,7 @@ export async function getAdminState(options?: GetAdminStateOptions): Promise<Adm
 
   const [cars, bookings, theme, sections, siteConfig, navItems, cities, testimonials, features, contact, socialLinks, agencies, seo, estimation, pricingTiers, estimationBadges, bookingForm, customThemes] = await Promise.all([
     prisma.car.findMany({ include: { images: { orderBy: { sortOrder: "asc" } } }, orderBy: { id: "asc" } }),
-    prisma.booking.findMany({ orderBy: { id: "asc" } }),
+    prisma.booking.findMany({ orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
     prisma.themeConfig.findUnique({ where: { id: "default" } }),
     prisma.sectionConfig.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.siteConfig.findUnique({ where: { id: "default" } }),
@@ -95,6 +95,7 @@ export async function getAdminState(options?: GetAdminStateOptions): Promise<Adm
     customer_name: booking.customerName,
     phone: booking.phone,
     email: booking.email,
+    created_at: booking.createdAt.toISOString(),
     pickup_date: booking.pickupDate.toISOString().slice(0, 10),
     return_date: booking.returnDate.toISOString().slice(0, 10),
     car_id: booking.carId,

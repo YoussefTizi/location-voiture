@@ -7,7 +7,11 @@ export async function GET(req: NextRequest) {
   try {
     const full = req.nextUrl.searchParams.get("full") === "1";
     const state = await getAdminState({ includeThemePreviewImages: full });
-    return NextResponse.json(state);
+    return NextResponse.json(state, {
+      headers: full
+        ? { "Cache-Control": "no-store" }
+        : { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" },
+    });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to load admin state", detail: error instanceof Error ? error.message : "unknown" },

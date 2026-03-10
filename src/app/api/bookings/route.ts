@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
       customer_name: booking.customerName,
       phone: booking.phone,
       email: booking.email,
+      created_at: booking.createdAt.toISOString(),
       pickup_date: toIsoDate(booking.pickupDate.toISOString()),
       return_date: toIsoDate(booking.returnDate.toISOString()),
       car_id: booking.carId,
