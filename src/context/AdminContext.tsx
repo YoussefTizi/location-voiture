@@ -88,6 +88,7 @@ interface AdminContextType {
 }
 
 const AdminContext = createContext<AdminContextType | null>(null);
+const STATE_CACHE_KEY = "drivestyle-public-state-v1";
 const EMPTY_STATS: DashboardStats = {
   total_revenue: 0,
   active_bookings: 0,
@@ -127,6 +128,49 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const sectionsPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSectionsRef = useRef<ExtendedSectionConfig[] | null>(null);
 
+  const applyStatePayload = useCallback((data: any) => {
+    setCars(Array.isArray(data?.cars) ? data.cars : []);
+    setBookings(Array.isArray(data?.bookings) ? data.bookings : []);
+    setStats(data?.stats ?? EMPTY_STATS);
+    setTheme(data?.theme ?? initialExtendedTheme);
+    setSections(Array.isArray(data?.sections) ? data.sections : []);
+    setSiteConfig(data?.siteConfig ?? initialSiteConfig);
+    setNavItems(Array.isArray(data?.navItems) ? data.navItems : []);
+    setCities(Array.isArray(data?.cities) ? data.cities : []);
+    setTestimonials(Array.isArray(data?.testimonials) ? data.testimonials : []);
+    setFeatures(Array.isArray(data?.features) ? data.features : []);
+    setContact(data?.contact ?? initialContact);
+    setSEO(data?.seo ?? initialSEO);
+    setEstimation(data?.estimation ?? initialEstimationConfig);
+    setBookingForm(data?.bookingForm ?? initialBookingFormConfig);
+    setCustomThemes(Array.isArray(data?.customThemes) ? data.customThemes : []);
+  }, []);
+
+  const readCachedPublicState = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem(STATE_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { payload?: unknown; cachedAt?: number };
+      if (!parsed?.payload) return null;
+      // Keep cache fresh for 24h to improve cold-load speed on mobile.
+      const age = Date.now() - Number(parsed.cachedAt || 0);
+      if (age > 24 * 60 * 60 * 1000) return null;
+      return parsed.payload;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const writeCachedPublicState = useCallback((payload: unknown) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(STATE_CACHE_KEY, JSON.stringify({ cachedAt: Date.now(), payload }));
+    } catch {
+      // ignore storage quota / private mode errors
+    }
+  }, []);
+
   const persistPatch = useCallback(async (patch: Record<string, unknown>) => {
     const res = await fetch("/api/admin/state", {
       method: "PUT",
@@ -141,52 +185,45 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const loadRemoteState = useCallback(async () => {
+    const isAdminRoute = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+    const stateUrl = isAdminRoute ? "/api/admin/state?full=1" : "/api/admin/state";
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeout = controller
+      ? window.setTimeout(() => controller.abort(), 8000)
+      : null;
     try {
-      const isAdminRoute = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
-      const stateUrl = isAdminRoute ? "/api/admin/state?full=1" : "/api/admin/state";
-      const res = await fetch(stateUrl, { method: "GET" });
+      const res = await fetch(stateUrl, {
+        method: "GET",
+        cache: isAdminRoute ? "no-store" : "force-cache",
+        signal: controller?.signal,
+      });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
         const error = typeof payload?.error === "string" ? payload.error : "Failed to load admin state";
         throw new Error(error);
       }
       const data = await res.json();
-
-      setCars(Array.isArray(data.cars) ? data.cars : []);
-      setBookings(Array.isArray(data.bookings) ? data.bookings : []);
-      setStats(data.stats ?? EMPTY_STATS);
-      setTheme(data.theme ?? initialExtendedTheme);
-      setSections(Array.isArray(data.sections) ? data.sections : []);
-      setSiteConfig(data.siteConfig ?? initialSiteConfig);
-      setNavItems(Array.isArray(data.navItems) ? data.navItems : []);
-      setCities(Array.isArray(data.cities) ? data.cities : []);
-      setTestimonials(Array.isArray(data.testimonials) ? data.testimonials : []);
-      setFeatures(Array.isArray(data.features) ? data.features : []);
-      setContact(data.contact ?? initialContact);
-      setSEO(data.seo ?? initialSEO);
-      setEstimation(data.estimation ?? initialEstimationConfig);
-      setBookingForm(data.bookingForm ?? initialBookingFormConfig);
-      setCustomThemes(Array.isArray(data.customThemes) ? data.customThemes : []);
+      applyStatePayload(data);
+      if (!isAdminRoute) writeCachedPublicState(data);
       setStateError(null);
     } catch (error) {
-      setCars([]);
-      setBookings([]);
-      setStats(EMPTY_STATS);
-      setSections([]);
-      setNavItems([]);
-      setCities([]);
-      setTestimonials([]);
-      setFeatures([]);
-      setCustomThemes([]);
       setStateError(error instanceof Error ? error.message : "Failed to load admin state");
     } finally {
+      if (timeout) window.clearTimeout(timeout);
       setStateReady(true);
     }
-  }, []);
+  }, [applyStatePayload, writeCachedPublicState]);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/admin")) {
+      const cached = readCachedPublicState();
+      if (cached) {
+        applyStatePayload(cached);
+        setStateReady(true);
+      }
+    }
     void loadRemoteState();
-  }, [loadRemoteState]);
+  }, [applyStatePayload, loadRemoteState, readCachedPublicState]);
 
   const syncPatch = useCallback((patch: Record<string, unknown>) => {
     void (async () => {

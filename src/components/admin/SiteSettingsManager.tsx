@@ -400,11 +400,13 @@ const SiteSettingsManager = () => {
             </div>
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Modèle de message WhatsApp</Label>
+            <Label className="text-xs text-muted-foreground">Modèle de message WhatsApp (estimation + réservation)</Label>
             <Textarea value={estimation.whatsapp_message_template}
               onChange={(e) => updateEstimation({ whatsapp_message_template: e.target.value })}
               className="mt-1 bg-secondary border-border text-xs" rows={4} />
-            <p className="text-[10px] text-muted-foreground mt-1">Variables : {"{vehicle}"}, {"{duration}"}, {"{total}"}, {"{currency}"}, {"{city}"}, {"{date}"}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Variables: {"{reference}"}, {"{vehicle}"}, {"{full_name}"} / {"{name}"}, {"{phone}"}, {"{email}"}, {"{pickup_date}"}, {"{return_date}"}, {"{duration}"} / {"{days}"}, {"{total}"} / {"{total_estimated}"}, {"{currency}"}, {"{city}"}, {"{date}"}
+            </p>
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Texte du bouton ({activeLang.toUpperCase()})</Label>

@@ -32,14 +32,14 @@ const BookingsManager = () => {
   const filtered = useMemo(() => {
     const byStatus = filter === "all" ? bookings : bookings.filter((b) => b.status === filter);
     const q = search.trim().toLowerCase();
-    if (!q) return byStatus;
-    return byStatus.filter((b) => {
+    const searched = !q ? byStatus : byStatus.filter((b) => {
       const carName = cars.find((c) => c.id === b.car_id)?.name || "";
       const haystack = [
         b.booking_id,
         b.customer_name,
         b.email,
         b.phone,
+        b.created_at,
         b.pickup_date,
         b.return_date,
         b.status,
@@ -50,10 +50,27 @@ const BookingsManager = () => {
       ].join(" ").toLowerCase();
       return haystack.includes(q);
     });
+    return [...searched].sort((a, b) => {
+      const aTime = new Date(a.created_at).getTime();
+      const bTime = new Date(b.created_at).getTime();
+      if (Number.isFinite(aTime) && Number.isFinite(bTime)) return bTime - aTime;
+      return b.booking_id.localeCompare(a.booking_id);
+    });
   }, [bookings, cars, filter, search]);
   const selectedBooking = bookings.find((b) => b.booking_id === selected);
   const getCarName = (id: string) => cars.find((c) => c.id === id)?.name || id;
   const safeValue = (value: string) => value?.trim() ? value : "—";
+  const formatCreatedAt = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  };
   const formatSnapshotMoney = (amount: number, code: string) =>
     `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount)} ${code}`;
 
@@ -141,6 +158,7 @@ const BookingsManager = () => {
               <th className="text-left p-3 text-xs uppercase tracking-wider text-muted-foreground font-medium">Réf.</th>
               <th className="text-left p-3 text-xs uppercase tracking-wider text-muted-foreground font-medium">Client</th>
               <th className="text-left p-3 text-xs uppercase tracking-wider text-muted-foreground font-medium hidden md:table-cell">Véhicule</th>
+              <th className="text-left p-3 text-xs uppercase tracking-wider text-muted-foreground font-medium hidden lg:table-cell">Créée le</th>
               <th className="text-left p-3 text-xs uppercase tracking-wider text-muted-foreground font-medium hidden lg:table-cell">Dates</th>
               <th className="text-left p-3 text-xs uppercase tracking-wider text-muted-foreground font-medium hidden xl:table-cell">Prix/jour</th>
               <th className="text-left p-3 text-xs uppercase tracking-wider text-muted-foreground font-medium hidden xl:table-cell">Total</th>
@@ -157,6 +175,7 @@ const BookingsManager = () => {
                   <p className="text-xs text-muted-foreground">{safeValue(b.email)}</p>
                 </td>
                 <td className="p-3 text-foreground hidden md:table-cell">{getCarName(b.car_id)}</td>
+                <td className="p-3 text-muted-foreground text-xs hidden lg:table-cell">{formatCreatedAt(b.created_at)}</td>
                 <td className="p-3 text-muted-foreground text-xs hidden lg:table-cell">{b.pickup_date} → {b.return_date}</td>
                 <td className="p-3 text-muted-foreground text-xs hidden xl:table-cell">{formatSnapshotMoney(b.price_per_day_snapshot, b.currency_code)}</td>
                 <td className="p-3 text-foreground text-xs font-medium hidden xl:table-cell">{formatSnapshotMoney(b.total_amount_snapshot, b.currency_code)}</td>
@@ -187,6 +206,7 @@ const BookingsManager = () => {
                 <div><p className="text-xs text-muted-foreground">Statut</p>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${statusConfig[selectedBooking.status].class}`}>{statusConfig[selectedBooking.status].label}</span>
                 </div>
+                <div><p className="text-xs text-muted-foreground">Créée le</p><p className="text-foreground">{formatCreatedAt(selectedBooking.created_at)}</p></div>
                 <div><p className="text-xs text-muted-foreground">Véhicule</p><p className="text-foreground">{getCarName(selectedBooking.car_id)}</p></div>
                 <div><p className="text-xs text-muted-foreground">Prix/jour (snapshot)</p><p className="text-foreground">{formatSnapshotMoney(selectedBooking.price_per_day_snapshot, selectedBooking.currency_code)}</p></div>
                 <div><p className="text-xs text-muted-foreground">Montant total</p><p className="text-foreground font-semibold">{formatSnapshotMoney(selectedBooking.total_amount_snapshot, selectedBooking.currency_code)}</p></div>

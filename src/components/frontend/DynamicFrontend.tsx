@@ -96,6 +96,26 @@ const formatCurrencyDisplay = (amount: number, currencyCode: string, fallbackSym
   return rule.position === "suffix" ? `${value} ${token}` : `${token}${value}`;
 };
 
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const applyWhatsappTemplate = (template: string, variables: Record<string, string>) => {
+  let output = template;
+  for (const [key, value] of Object.entries(variables)) {
+    const re = new RegExp(`\\{${escapeRegExp(key)}\\}`, "g");
+    output = output.replace(re, value);
+  }
+  return output;
+};
+
+const sanitizeWhatsappMessage = (message: string) => {
+  return message
+    .replace(/\uFFFD/g, "")
+    .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
 type BookingFieldKey = "full_name" | "email" | "phone" | "pickup_date" | "return_date";
 
 const getCurrencyFlag = (code: string) => {
@@ -532,10 +552,24 @@ const HeroSection = ({ config, theme }: { config: ExtendedSectionConfig; theme: 
   const generateWhatsAppLink = () => {
     if (!car || !tier) return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}`;
     const totalText = formatCurrencyAmount(total, curCode);
-    let msg = estimation.whatsapp_message_template
-      .replace("{vehicle}", car.name).replace("{duration}", String(days))
-      .replace("{total}", totalText).replace("{currency}", curCode)
-      .replace("{city}", estimation.default_city).replace("{date}", "—");
+    const rawMsg = applyWhatsappTemplate(estimation.whatsapp_message_template, {
+      vehicle: car.name,
+      duration: String(days),
+      days: String(days),
+      total: totalText,
+      total_estimated: totalText,
+      currency: curCode,
+      city: estimation.default_city,
+      date: "—",
+      reference: "",
+      full_name: "",
+      name: "",
+      phone: "",
+      email: "",
+      pickup_date: "",
+      return_date: "",
+    });
+    const msg = sanitizeWhatsappMessage(rawMsg);
     return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -1500,21 +1534,44 @@ const CarsSection = ({ config, theme, cars }: { config: ExtendedSectionConfig; t
 
   const buildBookingWhatsappLink = () => {
     if (!bookingConfirmed) return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}`;
-    const lines = [
+    const fallbackLines = [
       t("reservation_whatsapp_intro"),
-      `🧾 ${t("reservation_reference")}: ${bookingConfirmed.bookingId}`,
-      `🚗 ${t("select_vehicle")}: ${bookingConfirmed.carName}`,
+      `${t("reservation_reference")}: ${bookingConfirmed.bookingId}`,
+      `${t("select_vehicle")}: ${bookingConfirmed.carName}`,
     ];
-    if (bookingConfirmed.fullName) lines.push(`👤 ${t("full_name")}: ${bookingConfirmed.fullName}`);
-    if (bookingConfirmed.phone) lines.push(`📞 ${t("phone")}: ${bookingConfirmed.phone}`);
-    if (bookingConfirmed.email) lines.push(`✉️ ${t("email")}: ${bookingConfirmed.email}`);
-    if (bookingConfirmed.pickupDate) lines.push(`📅 ${t("pickup_date")}: ${bookingConfirmed.pickupDate}`);
-    if (bookingConfirmed.returnDate) lines.push(`📆 ${t("return_date")}: ${bookingConfirmed.returnDate}`);
+    if (bookingConfirmed.fullName) fallbackLines.push(`${t("full_name")}: ${bookingConfirmed.fullName}`);
+    if (bookingConfirmed.phone) fallbackLines.push(`${t("phone")}: ${bookingConfirmed.phone}`);
+    if (bookingConfirmed.email) fallbackLines.push(`${t("email")}: ${bookingConfirmed.email}`);
+    if (bookingConfirmed.pickupDate) fallbackLines.push(`${t("pickup_date")}: ${bookingConfirmed.pickupDate}`);
+    if (bookingConfirmed.returnDate) fallbackLines.push(`${t("return_date")}: ${bookingConfirmed.returnDate}`);
     if (bookingConfirmed.estimatedDays && bookingConfirmed.estimatedTotal) {
-      lines.push(`⏱️ ${t("days")}: ${bookingConfirmed.estimatedDays}`);
-      lines.push(`💰 ${t("total_estimated")}: ${bookingConfirmed.estimatedTotal}`);
+      fallbackLines.push(`${t("days")}: ${bookingConfirmed.estimatedDays}`);
+      fallbackLines.push(`${t("total_estimated")}: ${bookingConfirmed.estimatedTotal}`);
     }
-    const msg = lines.join("\n");
+    const fallbackMessage = fallbackLines.join("\n");
+    const template = (estimation.whatsapp_message_template || "").trim();
+    const rawMsg = template
+      ? applyWhatsappTemplate(template, {
+        reference: bookingConfirmed.bookingId,
+        vehicle: bookingConfirmed.carName,
+        full_name: bookingConfirmed.fullName || "",
+        name: bookingConfirmed.fullName || "",
+        phone: bookingConfirmed.phone || "",
+        email: bookingConfirmed.email || "",
+        pickup_date: bookingConfirmed.pickupDate || "",
+        return_date: bookingConfirmed.returnDate || "",
+        duration: bookingConfirmed.estimatedDays ? String(bookingConfirmed.estimatedDays) : "",
+        days: bookingConfirmed.estimatedDays ? String(bookingConfirmed.estimatedDays) : "",
+        total: bookingConfirmed.estimatedTotal || "",
+        total_estimated: bookingConfirmed.estimatedTotal || "",
+        currency: curCode,
+        city: estimation.default_city || "",
+        date: bookingConfirmed.pickupDate || "",
+      })
+      : fallbackMessage;
+    const refLine = `${t("reservation_reference")}: ${bookingConfirmed.bookingId}`;
+    const msgWithRef = rawMsg.includes(bookingConfirmed.bookingId) ? rawMsg : `${rawMsg}\n${refLine}`;
+    const msg = sanitizeWhatsappMessage(msgWithRef);
     return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -2245,21 +2302,44 @@ const EstimationSection = ({ config, theme }: { config: ExtendedSectionConfig; t
   };
   const buildReservationWhatsappLink = () => {
     if (!reservationConfirmed) return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}`;
-    const lines = [
+    const fallbackLines = [
       t("reservation_whatsapp_intro"),
-      `🧾 ${t("reservation_reference")}: ${reservationConfirmed.bookingId}`,
-      `🚗 ${t("select_vehicle")}: ${reservationConfirmed.carName}`,
+      `${t("reservation_reference")}: ${reservationConfirmed.bookingId}`,
+      `${t("select_vehicle")}: ${reservationConfirmed.carName}`,
     ];
-    if (reservationConfirmed.fullName) lines.push(`👤 ${t("full_name")}: ${reservationConfirmed.fullName}`);
-    if (reservationConfirmed.phone) lines.push(`📞 ${t("phone")}: ${reservationConfirmed.phone}`);
-    if (reservationConfirmed.email) lines.push(`✉️ ${t("email")}: ${reservationConfirmed.email}`);
-    if (reservationConfirmed.pickupDate) lines.push(`📅 ${t("pickup_date")}: ${reservationConfirmed.pickupDate}`);
-    if (reservationConfirmed.returnDate) lines.push(`📆 ${t("return_date")}: ${reservationConfirmed.returnDate}`);
+    if (reservationConfirmed.fullName) fallbackLines.push(`${t("full_name")}: ${reservationConfirmed.fullName}`);
+    if (reservationConfirmed.phone) fallbackLines.push(`${t("phone")}: ${reservationConfirmed.phone}`);
+    if (reservationConfirmed.email) fallbackLines.push(`${t("email")}: ${reservationConfirmed.email}`);
+    if (reservationConfirmed.pickupDate) fallbackLines.push(`${t("pickup_date")}: ${reservationConfirmed.pickupDate}`);
+    if (reservationConfirmed.returnDate) fallbackLines.push(`${t("return_date")}: ${reservationConfirmed.returnDate}`);
     if (reservationConfirmed.estimatedDays && reservationConfirmed.estimatedTotal) {
-      lines.push(`⏱️ ${t("days")}: ${reservationConfirmed.estimatedDays}`);
-      lines.push(`💰 ${t("total_estimated")}: ${reservationConfirmed.estimatedTotal}`);
+      fallbackLines.push(`${t("days")}: ${reservationConfirmed.estimatedDays}`);
+      fallbackLines.push(`${t("total_estimated")}: ${reservationConfirmed.estimatedTotal}`);
     }
-    const msg = lines.join("\n");
+    const fallbackMessage = fallbackLines.join("\n");
+    const template = (estimation.whatsapp_message_template || "").trim();
+    const rawMsg = template
+      ? applyWhatsappTemplate(template, {
+        reference: reservationConfirmed.bookingId,
+        vehicle: reservationConfirmed.carName,
+        full_name: reservationConfirmed.fullName || "",
+        name: reservationConfirmed.fullName || "",
+        phone: reservationConfirmed.phone || "",
+        email: reservationConfirmed.email || "",
+        pickup_date: reservationConfirmed.pickupDate || "",
+        return_date: reservationConfirmed.returnDate || "",
+        duration: reservationConfirmed.estimatedDays ? String(reservationConfirmed.estimatedDays) : "",
+        days: reservationConfirmed.estimatedDays ? String(reservationConfirmed.estimatedDays) : "",
+        total: reservationConfirmed.estimatedTotal || "",
+        total_estimated: reservationConfirmed.estimatedTotal || "",
+        currency: curCode,
+        city: estimation.default_city || "",
+        date: reservationConfirmed.pickupDate || "",
+      })
+      : fallbackMessage;
+    const refLine = `${t("reservation_reference")}: ${reservationConfirmed.bookingId}`;
+    const msgWithRef = rawMsg.includes(reservationConfirmed.bookingId) ? rawMsg : `${rawMsg}\n${refLine}`;
+    const msg = sanitizeWhatsappMessage(msgWithRef);
     return `https://wa.me/${contact.whatsapp.replace(/\s+/g, "")}?text=${encodeURIComponent(msg)}`;
   };
   const submitReservationDraft = async (e: React.FormEvent<HTMLFormElement>) => {

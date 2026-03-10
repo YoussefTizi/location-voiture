@@ -8,6 +8,7 @@ const mapBooking = (booking: {
   email: string;
   pickupDate: Date;
   returnDate: Date;
+  createdAt: Date;
   carId: string;
   status: string;
   pricePerDaySnapshot: number;
@@ -18,6 +19,7 @@ const mapBooking = (booking: {
   customer_name: booking.customerName,
   phone: booking.phone,
   email: booking.email,
+  created_at: booking.createdAt.toISOString(),
   pickup_date: booking.pickupDate.toISOString().slice(0, 10),
   return_date: booking.returnDate.toISOString().slice(0, 10),
   car_id: booking.carId,
